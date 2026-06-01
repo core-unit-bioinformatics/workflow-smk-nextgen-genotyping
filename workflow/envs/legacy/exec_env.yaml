@@ -1,0 +1,44 @@
+# legacy = Snakemake v7
+name: smk_exec_env
+dependencies:
+  # =====
+  # packages for Snakemake
+  # and the modules implemented
+  # as part of this template
+  - Python=3.11.*
+  - pip=25.1.*
+  - conda
+  - snakemake=7.32.*
+  - coincbc=2.10.*
+  - pyyaml=6.0.*
+  - toml=0.10.*
+  - semver=3.0.*
+  - portalocker=3.2.*
+  # === below:
+  # useful dep, no hard req. yet
+  # note to devs:
+  # if any of these pkg. is used
+  # explicitly in a template
+  # function, move the package up
+  - psutil=7.0.*
+  - pydantic=2.11.*
+  - python-dateutil=2.9.*
+  - smart_open=7.3.*
+  - cachetools=5.5.*
+  - humanfriendly=10.*
+  - requests=2.32.*
+  # =====
+  # minimal data science stack just
+  # for basic format conversion etc.
+  - pandas=2.3.*
+  - pytables=3.10.*
+  - hdf5=1.14.*
+  - pyarrow=20.0.*
+  - numpy=2.3.*
+  # === below:
+  # useful dep, no hard req. yet
+  # note to devs:
+  # if any of the below is used
+  # explicitly in a template
+  # function, move the package up
+  - protobuf=6.31.*

@@ -1,0 +1,67 @@
+name: smk_dev_env
+dependencies:
+  - Python=3.13.*  # the target Python3 version
+  - pip=26.*
+  # For conda itself:
+  # most recent; whatever can be resolved.
+  # Oct. '23 marks the switch to the libmamba
+  # solver and since then, there should not be
+  # too much of a speed difference between
+  # conda and mamba
+  - conda>25.0.0
+  # All of the below:
+  # There are config options set for these
+  # tools in 'tomls/formatting/pyproject.toml'
+  # and, hence, changing any of the versions
+  # requires checking that all options/parameters
+  # are still supported:
+  - pyyaml=6.0.*
+  - toml=0.10.*
+  - tomlkit=0.15.*
+  - semver=3.*
+  # =====
+  # BEGIN: DEV INCLUDE
+  # packages included in the development environment
+  # that are also defined in the template-metadata-files
+  - pylint=4.*
+  - isort=8.*
+  - black=26.*
+  - ruff=0.15.*
+  # END: DEV INCLUDE
+  # =====
+  # HERE: SPLIT BETWEEN TEMPLATE-METADATA-FILES CONDA ENV
+  # AND TEMPLATE-SNAKEMAKE CONDA ENV
+  # =====
+  # Snakemake-specific
+  # =====
+  - snakemake=9.11.*
+  - snakemake-interface-common=1.23.*
+  - snakemake-executor-plugin-cluster-generic=1.0.*
+  - coincbc=2.10.*
+  - portalocker=3.2.*
+  # =====
+  # BEGIN: DEV INCLUDE
+  - snakefmt=1.1.*
+  # END: DEV INCLUDE
+  # =====
+  # Below this line: utilities
+  # useful dep, no hard req. yet
+  # note to devs:
+  # if any of these pkg. is used
+  # explicitly in a template
+  # function, move the package up
+  - psutil=7.0.*
+  - pydantic=2.13.*
+  - smart_open=7.6.*
+  - humanfriendly=10.*
+  - requests=2.32.*
+  # =====
+  # Below this line: data science stack
+  # minimal data science stack just
+  # for basic format conversion etc.
+  - pandas=2.3.*
+  - pytables=3.10.*
+  - hdf5=1.14.*
+  - pyarrow=24.*
+  - numpy=2.4.*
+  - scipy=1.17.*

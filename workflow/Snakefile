@@ -1,0 +1,154 @@
+# Note that the testing module branch
+# is only included if the workflow is
+# executed in testing mode
+include: "rules/commons/00_commons.smk"
+
+# Introduced in v2.1.0
+# Templated base functionality to standardize
+# sample sheet handling. This snakemake module
+# will typically include workflow-specific
+# changes - just like 00_modules.smk below -
+# and thus exists outside of the 'commons'
+# folder hierarchy.
+include: "rules/10_sample_sheet.smk"
+
+
+if not RUN_IN_TEST_MODE:
+    include: "rules/00_modules.smk"
+    include: "rules/99_aggregate.smk"
+else:
+    logerr("DEBUG: test run detected - workflow module include skipped")
+
+
+rule run_all:
+    """
+    This is the default target rule to trigger
+    the execution of all rules in the workflow.
+    The 'run_all' rule includes the following three
+    templated workflow tasks:
+    1. dump the workflow config object into the results/ folder
+    2. copy the sample sheet into the results/ folder (if applicable)
+    3. create the workflow manifest file in the results/ folder (if applicable)
+
+    The object 'WORKFLOW_OUTPUT' is a simple list containing all
+    workflow outputs (files). This list is created in the module
+    rules::commons::99_aggregate.smk
+    """
+    input:
+        RUN_CONFIG_RELPATH,
+        COPY_SAMPLE_SHEET_RELPATH,
+        MANIFEST_RELPATH,
+        WORKFLOW_OUTPUT,
+
+
+rule run_all_no_manifest:
+    """
+    This rule is an alternative target to the
+    'run_all' rule that triggers the same series
+    of rule executions except for NOT creating
+    the workflow manifest file. Use this rule
+    as target in case of problems with creating
+    the workflow manifest file.
+    For more details, see the documentation
+    of the rule 'run_all'.
+    """
+    input:
+        RUN_CONFIG_RELPATH,
+        COPY_SAMPLE_SHEET_RELPATH,
+        WORKFLOW_OUTPUT,
+
+
+rule run_tests:
+    """
+    This rule triggers executing the testing
+    module of the workflow template located in
+    rules::commons::99-testing::*
+    The tests must succeed in all environments
+    (e.g., local/laptop or managed/HPC cluster)
+    unless explicitly designed for failure. Note
+    that running the tests only checks for a working
+    Snakemake setup and complete template because
+    the 'include' of any workflow-specific
+    (= non-template) modules is skipped.
+    The other targets of this rule are identical
+    to the 'run_all' rule; see that documentation
+    for details.
+    """
+    input:
+        RUN_CONFIG_RELPATH,
+        COPY_SAMPLE_SHEET_RELPATH,
+        MANIFEST_RELPATH,
+        WORKFLOW_OUTPUT
+
+
+rule run_tests_no_manifest:
+    """
+    The analogous rule to 'run_all_no_manifest'
+    for running the tests w/o creating a file
+    manifest. See the documentation of
+    'run_all_no_manifest' for details.
+    """
+    input:
+        RUN_CONFIG_RELPATH,
+        COPY_SAMPLE_SHEET_RELPATH,
+        WORKFLOW_OUTPUT
+
+
+rule run_build_docs:
+    """
+    Target this rule to update the auto-generated
+    documentation. This only updates the files:
+    docs/template/autodoc.md - template dev only
+    docs/workflow/autodoc.md - workflow dev only
+    This rule has no file input dependencies and
+    can always be executed.
+    """
+    retries: 0
+    run:
+        global DOC_RECORDER
+        try:
+            DOC_RECORDER.generate_documentation()
+        except Exception as err:
+            logerr(f"Auto-generating the workflow documentation failed: {str(err)}")
+            raise
+        else:
+            logout(f"Auto-generating the workflow documentation was successful.")
+
+
+onsuccess:
+    if any([DIR_CLUSTERLOG_OUT.is_dir(), DIR_CLUSTERLOG_ERR.is_dir()]):
+        shell(f"rm -rf {DIR_CLUSTERLOG_OUT} && mkdir -p {DIR_CLUSTERLOG_OUT}")
+        shell(f"rm -rf {DIR_CLUSTERLOG_ERR} && mkdir -p {DIR_CLUSTERLOG_ERR}")
+    shell(f"rm -f {RUN_CONFIG_RELPATH.with_suffix('.bak.yaml')}")
+    shell(f"rm -f {_SMK_CLI_CAPTURE_CACHE_FILE}")
+
+
+onerror:
+    try:
+        rsync_f2f(RUN_CONFIG_RELPATH, RUN_CONFIG_RELPATH.with_suffix(".bak.yaml"))
+    except FileNotFoundError:
+        # can happen when creation of a single file is requested
+        # during development
+        pass
+    shell(f"rm -f {RUN_CONFIG_RELPATH}")
+    shell(f"rm -f {_SMK_CLI_CAPTURE_CACHE_FILE}")
+
+
+# Documentation for the main workflow
+# target rules
+
+_THIS_MODULE = ["Snakefile"]
+_THIS_CONTEXT = DocContext.TEMPLATE
+
+DOCREC.add_module_doc(_THIS_CONTEXT, _THIS_MODULE)
+
+DOCREC.add_rule_doc(rules.run_all.rule)
+
+DOCREC.add_rule_doc(rules.run_all_no_manifest.rule)
+
+DOCREC.add_rule_doc(rules.run_build_docs.rule)
+
+DOCREC.add_rule_doc(rules.run_tests.rule)
+
+DOCREC.add_rule_doc(rules.run_tests_no_manifest.rule)
+

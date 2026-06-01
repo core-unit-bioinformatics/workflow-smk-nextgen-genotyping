@@ -3,8 +3,8 @@ pid = "https://github.com/core-unit-bioinformatics/template-metadata-files"
 version = "2.1.0"
 
 [cubi.workflow]
-pid = "undefined"
-name = "undefined"
+pid = "https://github.com/core-unit-bioinformatics/workflow-smk-nextgen-genotyping"
+name = "nextgen-genotyping"
 version = "prototype"
 
 [tool.black]
@@ -23,15 +23,9 @@ line_length = 88
 include = "\\.smk$|^Snakefile"
 
 [cubi.workflow.template]
-pid = "undefined"
-system = "system"
-version = "prototype"
-
-[tool.pylint.format]
-max-line-length = "88"
-
-[tool.pylint.messages_control]
-disable = [ "logging-fstring-interpolation", "useless-return", "missing-module-docstring",]
+pid = "https://github.com/core-unit-bioinformatics/template-snakemake"
+system = "smk"
+version = "2.2.1"
 
 [tool.ruff.format]
 line-ending = "lf"
@@ -43,3 +37,9 @@ skip-magic-trailing-comma = false
 select = [ "E", "F", "B", "I", "UP",]
 ignore = []
 unfixable = [ "B",]
+
+[tool.pylint.format]
+max-line-length = "88"
+
+[tool.pylint.messages_control]
+disable = [ "logging-fstring-interpolation", "useless-return", "missing-module-docstring",]
