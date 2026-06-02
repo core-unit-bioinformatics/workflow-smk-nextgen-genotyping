@@ -1,4 +1,29 @@
 
+# Reference files for PanGenie
+# See the PanGenie documentation/wiki for more details:
+# https://github.com/eblerjana/pangenie/wiki/D:-Running-PanGenie-on-HPRC-data
+
+# The linear reference genome such as hg38 or chm13/T2T
+# is expected to be in fasta format, and may optionally be gzipped.
+# Valid example input file:
+# https://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/HGSVC2/technical/reference/20200513_hg38_NoALT/hg38.no_alt.fa.gz
+linear_reference_genome: "mock_linear_refence_genome.fasta"
+
+# The pangenome reference graph is expected to be a variation graph in vcf format,
+# and may optionally be gzipped.
+# Valid example input file:
+# https://s3-us-west-2.amazonaws.com/human-pangenomics/pangenomes/scratch/2025_02_28_minigraph_cactus/hprc-v2.0-mc-grch38/hprc-v2.0-mc-grch38.pgin.vcf.gz
+pangenome_reference_graph: "mock_pangenome_reference_graph.vcf"
+
+# The reference callset is expected to be in vcf format, and may optionally be gzipped.
+# Valid example input file:
+# https://s3-us-west-2.amazonaws.com/human-pangenomics/pangenomes/scratch/2025_02_28_minigraph_cactus/hprc-v2.0-mc-grch38/hprc-v2.0-mc-grch38.pgbi.vcf.gz
+reference_callset: "mock_reference_callset.vcf"
+
+
+
+
+
 # Config options to use reference container
 # as part of the pipeline
 use_reference_container: false

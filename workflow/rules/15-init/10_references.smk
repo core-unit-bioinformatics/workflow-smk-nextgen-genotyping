@@ -1,0 +1,11 @@
+
+
+PANGENOME_REFERENCE_GRAPH = config["pangenome_reference_graph"]
+PANGENOME = PANGENOME_REFERENCE_GRAPH
+
+REFERENCE_CALLSET = config["reference_callset"]
+CALLSET = REFERENCE_CALLSET
+
+LINEAR_REFERENCE_GENOME = config["linear_reference_genome"]
+GENOME = LINEAR_REFERENCE_GENOME
+

@@ -1,0 +1,4 @@
+name: file_prep
+dependencies:
+  - seqtk=1.5.*
+  - pgzip=0.4.*

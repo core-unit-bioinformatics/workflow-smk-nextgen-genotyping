@@ -1,0 +1,4 @@
+sample	input_path
+sampleA	input/mock_readsA.fasta
+sampleB	input/mock_readsB_1.fq,input/mock_readsB_2.fq
+sampleC	input/mock_reads.fofn
