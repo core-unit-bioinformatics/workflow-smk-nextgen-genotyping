@@ -15,7 +15,7 @@ rule prepare_sample_input_reads:
         mem_mb=lambda wildcards, attempt: 2048 * attempt,
         time_hrs=lambda wildcards, attempt: attempt * attempt
     params:
-        cmd=lambda wildcards, input, output: select_prepare_sample_input_reads_command(
+        cmd=lambda wildcards, threads, input, output: select_prepare_sample_input_reads_command(
             wildcards.sample, input.reads, output.reads, threads
         )
     shell:
