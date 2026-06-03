@@ -1,0 +1,6 @@
+name: pangenie
+dependencies:
+  - python=3.*
+  - pangenie=4.2.*
+  - bcftools=1.23.*
+  - tabix=1.11.*

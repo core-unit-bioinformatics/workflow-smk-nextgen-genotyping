@@ -7,18 +7,25 @@
 # is expected to be in fasta format, and may optionally be gzipped.
 # Valid example input file:
 # https://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/HGSVC2/technical/reference/20200513_hg38_NoALT/hg38.no_alt.fa.gz
-linear_reference_genome: "mock_linear_refence_genome.fasta"
+linear_reference_genome:
+  label: MOCKgenome
+  path: mock_linear_reference_genome.fasta
 
 # The pangenome reference graph is expected to be a variation graph in vcf format,
 # and may optionally be gzipped.
 # Valid example input file:
 # https://s3-us-west-2.amazonaws.com/human-pangenomics/pangenomes/scratch/2025_02_28_minigraph_cactus/hprc-v2.0-mc-grch38/hprc-v2.0-mc-grch38.pgin.vcf.gz
-pangenome_reference_graph: "mock_pangenome_reference_graph.vcf"
+pangenome_reference_graph:
+  label: MOCKpangen
+  path: mock_pangenome_reference_graph.vcf
+
 
 # The reference callset is expected to be in vcf format, and may optionally be gzipped.
 # Valid example input file:
 # https://s3-us-west-2.amazonaws.com/human-pangenomics/pangenomes/scratch/2025_02_28_minigraph_cactus/hprc-v2.0-mc-grch38/hprc-v2.0-mc-grch38.pgbi.vcf.gz
-reference_callset: "mock_reference_callset.vcf"
+reference_callset:
+  label: MOCKcalls
+  path: mock_reference_callset.vcf
 
 
 

@@ -5,10 +5,12 @@ rule prepare_sample_input_reads:
     input:
         reads = lambda wildcards: SAMPLE_INPUT_FILES[wildcards.sample]
     output:
-        reads = temp(DIR_PROC.joinpath("20-prepare", "input_reads", "{sample}_reads.fasta"))
+        reads = temp(DIR_PROC.joinpath("20-prepare", "20_inputs", "{sample}_reads.fasta"))
+    benchmark:
+        DIR_RSRC.joinpath("20-prepare", "20_inputs", "{sample}_prep-reads.rsrc")
     conda:
         DIR_ENVS.joinpath("file_prep.yaml")
-    threads: 2
+    threads: CPU_LOW
     resources:
         mem_mb=lambda wildcards, attempt: 2048 * attempt,
         time_hrs=lambda wildcards, attempt: attempt * attempt

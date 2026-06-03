@@ -12,3 +12,5 @@ WORKFLOW_OUTPUT = []
 # (remember to include that module
 # in 00_modules.smk):
 # WORKFLOW_OUTPUT.extend(MODULE_OUTPUT)
+
+WORKFLOW_OUTPUT.extend(rules.run_all_pangenie_genotyping.input.vcf)
