@@ -68,7 +68,7 @@ rule convert_pangenie_genotypes_to_biallelic:
         mem_mb=lambda wildcards, attempt: 4096 * attempt,
         time_hrs=lambda wildcards, attempt: attempt * attempt
     params:
-        script=find_script("convert-to-biallelic.py")
+        script=get_script("convert-to-biallelic.py")
     shell:
         "cat {input.vcf} | {params.script} {input.ref_callset} | bgzip > {output.vcf}"
             " && "
