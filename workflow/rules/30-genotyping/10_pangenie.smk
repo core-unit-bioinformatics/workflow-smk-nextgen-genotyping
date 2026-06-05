@@ -65,7 +65,7 @@ rule convert_pangenie_genotypes_to_biallelic:
     conda:
         DIR_ENVS.joinpath("pangenie.yaml")
     resources:
-        mem_mb=lambda wildcards, attempt: 16384 * attempt,
+        mem_mb=lambda wildcards, attempt: 24576 * attempt,
         time_hrs=lambda wildcards, attempt: attempt * attempt
     params:
         script=get_script("convert-to-biallelic.py")
