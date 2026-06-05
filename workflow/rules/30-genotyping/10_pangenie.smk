@@ -17,8 +17,8 @@ rule run_pangenie_indexing:
         DIR_ENVS.joinpath("pangenie.yaml")
     threads: CPU_MEDIUM
     resources:
-        mem_mb=lambda wildcards, attempt: 65536 * attempt,
-        time_hrs=lambda wildcards, attempt: 5 * attempt
+        mem_mb=lambda wildcards, attempt: 65536 + 65536 * attempt,
+        time_hrs=lambda wildcards, attempt: 4 * attempt
     params:
        idx_prefix = lambda wildcards, output: pathlib.Path(output.idx_dir).joinpath(f"{wildcards.ref_genome}_{wildcards.ref_graph}")
     shell:
@@ -43,8 +43,8 @@ rule run_pangenie_genotyping:
         DIR_ENVS.joinpath("pangenie.yaml")
     threads: CPU_HIGH
     resources:
-        mem_mb=lambda wildcards, attempt: 65536 * attempt,
-        time_hrs=lambda wildcards, attempt: 5 * attempt
+        mem_mb=lambda wildcards, attempt: 32768 + 3276 * attempt,
+        time_hrs=lambda wildcards, attempt: attempt
     params:
         out_prefix = lambda wildcards, output: str(output.vcf).rsplit("_",1)[0],
         idx_prefix = lambda wildcards, input: pathlib.Path(input.idx_dir).joinpath(f"{wildcards.ref_genome}_{wildcards.ref_graph}")
@@ -65,7 +65,7 @@ rule convert_pangenie_genotypes_to_biallelic:
     conda:
         DIR_ENVS.joinpath("pangenie.yaml")
     resources:
-        mem_mb=lambda wildcards, attempt: 4096 * attempt,
+        mem_mb=lambda wildcards, attempt: 16384 * attempt,
         time_hrs=lambda wildcards, attempt: attempt * attempt
     params:
         script=get_script("convert-to-biallelic.py")
