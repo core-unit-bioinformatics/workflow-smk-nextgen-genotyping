@@ -72,7 +72,7 @@ rule convert_pangenie_genotypes_to_biallelic:
     shell:
         "cat {input.vcf} | {params.script} {input.ref_callset} | bgzip > {output.vcf}"
             " && "
-        "tabix -p vcf {output.tbi}"
+        "tabix -p vcf {output.vcf}"
 
 
 rule merge_pangenie_genotypes_to_multisample:
