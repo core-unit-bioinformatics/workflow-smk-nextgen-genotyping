@@ -6,7 +6,7 @@ pangenome_reference_graph:
   label: mypangenome
   path: /gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/wd/input_data/hprc.vcf.gz          # plain .vcf also works
   
-  loci_catalog:
+loci_catalog:
   label: mylociset                     # alphanumeric only
   path: /gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/wd/input_data/loci.bed
 
