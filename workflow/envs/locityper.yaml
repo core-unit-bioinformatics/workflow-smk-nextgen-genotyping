@@ -1,0 +1,10 @@
+name: locityper
+dependencies:
+  - python=3.*
+  - numpy
+  - locityper
+  - samtools=1.21.*
+  - jellyfish=2.3.*
+  - vcfbub
+  - bcftools=1.23.*
+  - tabix=1.11.* 

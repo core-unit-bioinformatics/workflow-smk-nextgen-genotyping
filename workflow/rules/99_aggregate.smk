@@ -13,4 +13,8 @@ WORKFLOW_OUTPUT = []
 # in 00_modules.smk):
 # WORKFLOW_OUTPUT.extend(MODULE_OUTPUT)
 
-WORKFLOW_OUTPUT.extend(rules.run_all_pangenie_genotyping.input.vcf)
+if RUN_PANGENIE:
+    WORKFLOW_OUTPUT.extend(rules.run_all_pangenie_genotyping.input.vcf)
+
+if RUN_LOCITYPER:
+    WORKFLOW_OUTPUT.extend(rules.run_all_locityper_genotyping.input.csv)
