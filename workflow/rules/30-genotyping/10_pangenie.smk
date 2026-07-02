@@ -111,4 +111,3 @@ rule run_all_pangenie_genotyping:
             ref_graph=REFERENCE_WILDCARD_LOOKUP[ReferenceTypes.PANGENOME],
             ref_callset=REFERENCE_WILDCARD_LOOKUP[ReferenceTypes.CALLSET]
         )
-sample1_test1
