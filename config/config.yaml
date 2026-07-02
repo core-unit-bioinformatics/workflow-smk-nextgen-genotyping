@@ -1,13 +1,17 @@
 linear_reference_genome:
-  label: hg38                          # alphanumeric only - becomes the {ref_genome} wildcard value
+  label: hg38ref                     # alphanumeric only
   path: /gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/wd/input_data/hg38.no_alt.fa.gz      # plain .fasta also works
 
 pangenome_reference_graph:
-  label: mypangenome
+  label: graphref                  # alphanumeric only
   path: /gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/wd/input_data/hprc.vcf.gz          # plain .vcf also works
-  
+
+reference_callset:
+  label: callsetref
+  path: /gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/wd/input_data/cactus_filtered_ids_biallelic.vcf.gz
+
 loci_catalog:
-  label: mylociset                     # alphanumeric only
+  label: lociset                     # alphanumeric only
   path: /gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/wd/input_data/loci.bed
 
 tools: "pangenie,locityper"           # or set via --config tools=... on the CLI instead
