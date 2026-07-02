@@ -57,7 +57,7 @@ rule count_locityper_reference_kmers:
         DIR_ENVS.joinpath("locityper.yaml")
     threads: CPU_MEDIUM
     resources:
-        mem_mb=lambda wildcards, attempt: 8192 * attempt,
+        mem_mb=lambda wildcards, attempt: (32 * 1024) * attempt,
         time_hrs=lambda wildcards, attempt: 4 * attempt
     shell:
         "jellyfish count --canonical --lower-count 2 --out-counter-len 2"
