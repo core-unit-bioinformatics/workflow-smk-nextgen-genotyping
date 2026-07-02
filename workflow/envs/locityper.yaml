@@ -1,10 +1,9 @@
 name: locityper
 dependencies:
-  - python=3.*
+  - python>3.10
   - numpy
   - locityper
-  - samtools=1.21.*
-  - jellyfish=2.3.*
+  - samtools
+  - jellyfish
   - vcfbub
-  - bcftools=1.23.*
-  - tabix=1.11.* 
+  - htslib
