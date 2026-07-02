@@ -43,7 +43,7 @@ rule run_pangenie_genotyping:
         DIR_ENVS.joinpath("pangenie.yaml")
     threads: CPU_HIGH
     resources:
-        mem_mb=lambda wildcards, attempt: 32768 + 3276 * attempt,
+        mem_mb=lambda wildcards, attempt: (64 * 1024) + (8192 * attempt),
         time_hrs=lambda wildcards, attempt: attempt
     params:
         out_prefix = lambda wildcards, output: str(output.vcf).rsplit("_",1)[0],
@@ -111,3 +111,4 @@ rule run_all_pangenie_genotyping:
             ref_graph=REFERENCE_WILDCARD_LOOKUP[ReferenceTypes.PANGENOME],
             ref_callset=REFERENCE_WILDCARD_LOOKUP[ReferenceTypes.CALLSET]
         )
+sample1_test1
