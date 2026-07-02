@@ -143,7 +143,7 @@ rule preprocess_locityper_reads:
         DIR_ENVS.joinpath("locityper.yaml")
     threads: CPU_MEDIUM
     resources:
-        mem_mb=lambda wildcards, attempt: 8192 * attempt,
+        mem_mb=lambda wildcards, attempt: (16 * 1024) * attempt,
         time_hrs=lambda wildcards, attempt: 4 * attempt
     shell:
         "locityper preproc -i {input.reads} -r {input.genome_fasta}"
