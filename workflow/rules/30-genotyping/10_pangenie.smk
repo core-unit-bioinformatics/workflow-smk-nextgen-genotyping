@@ -44,7 +44,7 @@ rule run_pangenie_genotyping:
     threads: CPU_HIGH
     resources:
         mem_mb=lambda wildcards, attempt: (64 * 1024) + (8192 * attempt),
-        time_hrs=lambda wildcards, attempt: attempt
+        time_hrs=lambda wildcards, attempt: 12 * attempt
     params:
         out_prefix = lambda wildcards, output: str(output.vcf).rsplit("_",1)[0],
         idx_prefix = lambda wildcards, input: pathlib.Path(input.idx_dir).joinpath(f"{wildcards.ref_genome}_{wildcards.ref_graph}")
@@ -66,7 +66,7 @@ rule convert_pangenie_genotypes_to_biallelic:
         DIR_ENVS.joinpath("pangenie.yaml")
     resources:
         mem_mb=lambda wildcards, attempt: 24576 * attempt,
-        time_hrs=lambda wildcards, attempt: attempt * attempt
+        time_hrs=lambda wildcards, attempt: attempt * attempt   # intentionally exponential?
     params:
         script=get_script("convert-to-biallelic.py")
     shell:
@@ -96,7 +96,7 @@ rule merge_pangenie_genotypes_to_multisample:
         DIR_ENVS.joinpath("pangenie.yaml")
     resources:
         mem_mb=lambda wildcards, attempt: 4096 * attempt,
-        time_hrs=lambda wildcards, attempt: attempt * attempt
+        time_hrs=lambda wildcards, attempt: attempt * attempt   # intentionally exponential?
     shell:
         "bcftools merge {input.vcf} -Oz -o {output.vcf}"
             " && "
