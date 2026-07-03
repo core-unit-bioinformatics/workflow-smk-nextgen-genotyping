@@ -43,14 +43,13 @@ rule run_pangenie_genotyping:
         DIR_ENVS.joinpath("pangenie.yaml")
     threads: CPU_HIGH
     resources:
-        mem_mb=lambda wildcards, attempt: (64 * 1024) + (8192 * attempt),
+        mem_mb=lambda wildcards, attempt: (64 * 1024) + (8192 * attempt-1),
         time_hrs=lambda wildcards, attempt: 12 * attempt
     params:
         out_prefix = lambda wildcards, output: str(output.vcf).rsplit("_",1)[0],
         idx_prefix = lambda wildcards, input: pathlib.Path(input.idx_dir).joinpath(f"{wildcards.ref_genome}_{wildcards.ref_graph}")
     shell:
         "PanGenie -f {params.idx_prefix} -i {input.reads} -o {params.out_prefix} -t {threads} -j {threads} -s {wildcards.sample} &> {log}"
-
 
 
 rule convert_pangenie_genotypes_to_biallelic:
@@ -96,9 +95,11 @@ rule merge_pangenie_genotypes_to_multisample:
         DIR_ENVS.joinpath("pangenie.yaml")
     resources:
         mem_mb=lambda wildcards, attempt: 4096 * attempt,
-        time_hrs=lambda wildcards, attempt: attempt * attempt   # intentionally exponential?
+        time_hrs=lambda wildcards, attempt: attempt * attempt
+    params:
+        force_single = lambda wildcards, input: "--force-single" if len(input.vcf) == 1 else ""
     shell:
-        "bcftools merge {input.vcf} -Oz -o {output.vcf}"
+        "bcftools merge {params.force_single} {input.vcf} -Oz -o {output.vcf}"
             " && "
         "tabix -p vcf {output.vcf}"
 
