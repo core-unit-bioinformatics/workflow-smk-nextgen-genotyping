@@ -1,3 +1,19 @@
+SAMPLES_PANGENIE = [
+    sample for sample in SAMPLES
+    if not any(is_cram_file(f) for f in SAMPLE_INPUT_FILES[sample])
+]
+
+for sample in sorted(set(SAMPLES) - set(SAMPLES_PANGENIE)):
+    logerr(
+        f"WARNING: sample '{sample}' provides CRAM input, which pangenie "
+        "does not support (requires FASTA/FASTQ reads). Skipped for pangenie."
+    )
+
+if not SAMPLES_PANGENIE:
+    err_msg = "Error: no samples are compatible with pangenie genotyping (all provide CRAM-only input)."
+    logerr(err_msg)
+    raise ValueError(err_msg)
+
 
 rule run_pangenie_indexing:
     input:
@@ -78,12 +94,12 @@ rule merge_pangenie_genotypes_to_multisample:
     input:
         vcf = expand(
             rules.convert_pangenie_genotypes_to_biallelic.output.vcf,
-            sample=SAMPLES,
+            sample=SAMPLES_PANGENIE,
             allow_missing=True
         ),
         tbi = expand(
             rules.convert_pangenie_genotypes_to_biallelic.output.tbi,
-            sample=SAMPLES,
+            sample=SAMPLES_PANGENIE,
             allow_missing=True
         )
     output:
