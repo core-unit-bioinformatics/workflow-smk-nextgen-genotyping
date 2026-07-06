@@ -94,23 +94,23 @@ if CRAM_SAMPLES_PRESENT:
                 "{params.cmd} &> {log}"
 
 
-        rule index_locityper_cram_reference_genome:
-            input:
-                genome_fasta = rules.prepare_locityper_cram_reference_genome.output.genome_fasta
-            output:
-                genome_index = DIR_LOCAL_REF.joinpath("cram_reference.fasta.fai")
-            log:
-                DIR_LOG.joinpath("30-genotyping", "20_locityper", "lt_cram", "cram_reference.faidx.log")
-            benchmark:
-                DIR_RSRC.joinpath("30-genotyping", "20_locityper", "lt_cram", "cram_reference.faidx.rsrc")
-            conda:
-                DIR_ENVS.joinpath("locityper.yaml")
-            threads: CPU_LOW
-            resources:
-                mem_mb=lambda wildcards, attempt: 1024 * attempt,
-                time_hrs=lambda wildcards, attempt: attempt
-            shell:
-                "samtools faidx {input.genome_fasta} &> {log}"
+    rule index_locityper_cram_reference_genome:
+        input:
+            genome_fasta = rules.prepare_locityper_cram_reference_genome.output.genome_fasta
+        output:
+            genome_index = DIR_LOCAL_REF.joinpath("cram_reference.fasta.fai")
+        log:
+            DIR_LOG.joinpath("30-genotyping", "20_locityper", "lt_cram", "cram_reference.faidx.log")
+        benchmark:
+            DIR_RSRC.joinpath("30-genotyping", "20_locityper", "lt_cram", "cram_reference.faidx.rsrc")
+        conda:
+            DIR_ENVS.joinpath("locityper.yaml")
+        threads: CPU_LOW
+        resources:
+            mem_mb=lambda wildcards, attempt: 1024 * attempt,
+            time_hrs=lambda wildcards, attempt: attempt
+        shell:
+            "samtools faidx {input.genome_fasta} &> {log}"
 
 
 rule index_locityper_cram_alignment:
