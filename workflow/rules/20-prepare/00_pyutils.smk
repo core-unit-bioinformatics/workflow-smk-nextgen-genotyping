@@ -33,18 +33,31 @@ def is_fastq_file(file_path):
     return name.endswith((".fastq", ".fastq.gz", ".fq", ".fq.gz"))
 
 
-def classify_locityper_library_type(sample, sample_files):
-    """Infer whether a sample's input reads are usable by locityper,
-    and if so whether they are single-end ("se") or paired-end ("pe").
+def is_cram_file(file_path):
+    """Return True if file_path looks like a CRAM alignment file."""
+    return str(file_path).lower().endswith(".cram")
 
-    Locityper requires FASTQ input, and exactly 1 (single-end) or
-    2 (paired-end) files per sample. Returns None 
-    if the sample is not compatible with locityper and skip it.
+
+def classify_sample_input_type(sample, sample_files):
+    """Classify a sample's input files for use across tools.
+
+    Returns one of:
+        "se"   - single-end FASTQ (1 file)
+        "pe"   - paired-end FASTQ (2 files)
+        "cram" - single CRAM alignment file
+        None   - incompatible/unrecognized combination; callers should
+                 skip this sample for whichever tool required this
+                 classification (see e.g. SAMPLES_LOCITYPER)
     """
+
+    if len(sample_files) == 1 and is_cram_file(sample_files[0]):
+        return "cram"
+
     if not all(is_fastq_file(f) for f in sample_files):
         logerr(
-            f"WARNING: sample '{sample}' has non-FASTQ input "
-            f"({sample_files}) - skipping for locityper genotyping."
+            f"WARNING: sample '{sample}' has input that is neither FASTQ "
+            f"nor a single CRAM file ({sample_files}). Skipped for locityper."
+            
         )
         return None
 
@@ -55,7 +68,7 @@ def classify_locityper_library_type(sample, sample_files):
 
     logerr(
         f"WARNING: sample '{sample}' resolves to {len(sample_files)} input "
-        "files - locityper requires exactly 1 (single-end) or 2 "
-        "(paired-end) FASTQ files; skipping for locityper genotyping."
+        f"files. Expected 1 (single-end FASTQ or CRAM) or 2 "
+        f"(paired-end FASTQ) files. Skipped for locityper."
     )
     return None
