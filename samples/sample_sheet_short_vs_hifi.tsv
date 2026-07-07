@@ -1,0 +1,5 @@
+ 
+sample	input_path
+HG00733_short_wustl	/gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/workflow-smk-nextgen-genotyping/samples/HG00733_shortwgs_fastq.wustl-PRJNA477862-20XX.fofn
+HG00733_short_nygc	/gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/workflow-smk-nextgen-genotyping/samples/HG00733_shortwgs_fastq.nygc-PRJEB36890-2020.fofn
+HG00733_hifi_hgsvc	/gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/workflow-smk-nextgen-genotyping/samples/HG00733_hifi_fastq.hgsvc-UW-2023.f1f4e3c8.fofn
