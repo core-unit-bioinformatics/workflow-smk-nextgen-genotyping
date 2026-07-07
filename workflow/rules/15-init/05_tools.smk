@@ -10,7 +10,7 @@ _AVAILABLE_TOOLS = {"pangenie", "locityper"}
 
 if "tools" not in config or not str(config["tools"]).strip():
     TOOLS_LIST = sorted(_AVAILABLE_TOOLS)
-    logerr(
+    logout(
         "No 'tools' parameter was provided on the command line "
         "(--config tools=...) or in the config file. Defaulting to "
         f"running all available tools: {TOOLS_LIST}"
@@ -19,7 +19,7 @@ else:
     TOOLS_LIST = sorted(set(
         t.strip().lower() for t in str(config["tools"]).split(",") if t.strip()
     ))
-    logerr(f"Tools requested for this run (via config): {TOOLS_LIST}")
+    logout(f"Tools requested for this run (via config): {TOOLS_LIST}")
 
 _invalid_tools = set(TOOLS_LIST) - _AVAILABLE_TOOLS
 if _invalid_tools:

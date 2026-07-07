@@ -4,7 +4,7 @@ SAMPLES_PANGENIE = [
 ]
 
 for sample in sorted(set(SAMPLES) - set(SAMPLES_PANGENIE)):
-    logerr(
+    logout(
         f"WARNING: sample '{sample}' provides CRAM input, which pangenie "
         "does not support (requires FASTA/FASTQ reads). Skipped for pangenie."
     )

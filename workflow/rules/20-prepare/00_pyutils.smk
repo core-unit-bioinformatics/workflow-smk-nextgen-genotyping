@@ -54,7 +54,7 @@ def classify_sample_input_type(sample, sample_files):
         return "cram"
 
     if not all(is_fastq_file(f) for f in sample_files):
-        logerr(
+        logout(
             f"WARNING: sample '{sample}' has input that is neither FASTQ "
             f"nor a single CRAM file ({sample_files}). Skipped for locityper."
             
@@ -66,7 +66,7 @@ def classify_sample_input_type(sample, sample_files):
     if len(sample_files) == 2:
         return "pe"
 
-    logerr(
+    logout(
         f"WARNING: sample '{sample}' resolves to {len(sample_files)} input "
         f"files. Expected 1 (single-end FASTQ or CRAM) or 2 "
         f"(paired-end FASTQ) files. Skipped for locityper."
