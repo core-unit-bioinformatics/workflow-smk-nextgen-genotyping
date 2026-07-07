@@ -258,7 +258,7 @@ rule preprocess_locityper_reads:
             " --threads {threads} &> {log}"
 
 
-rule locityper_genotype_sample:
+rule run_locityper_genotype_sample:
     """Run 'locityper genotype' (handles single-end FASTQ,
     paired-end FASTQ, and CRAM input)."""
     input:
@@ -312,7 +312,7 @@ rule create_locityper_sample_manifest:
     """Write a (path, sample) manifest for merge by into_csv.py -I."""
     input:
         sample_dirs = expand(
-            rules.locityper_genotype_sample.output.genotype_dir,
+            rules.run_locityper_genotype_sample.output.genotype_dir,
             sample=SAMPLES_LOCITYPER,
             allow_missing=True
         )
