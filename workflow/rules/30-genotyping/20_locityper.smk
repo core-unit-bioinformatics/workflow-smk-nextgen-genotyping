@@ -288,8 +288,8 @@ rule run_locityper_genotyping:
         DIR_ENVS.joinpath("locityper.yaml")
     threads: CPU_HIGH
     resources:
-        mem_mb=lambda wildcards, attempt: (64 * 1024) * attempt + (32 * 1024) * (attempt -1),
-        time_hrs=lambda wildcards, attempt: 2 * attempt
+        mem_mb=lambda wildcards, attempt: (72 * 1024) * attempt + (32 * 1024) * (attempt -1),
+        time_hrs=lambda wildcards, attempt: 3 * attempt
     params:
         read_flag = lambda wildcards: (
             "-a" if classify_sample_input_type(wildcards.sample, SAMPLE_INPUT_FILES[wildcards.sample]) == "cram"
