@@ -59,8 +59,8 @@ rule run_pangenie_genotyping:
         DIR_ENVS.joinpath("pangenie.yaml")
     threads: CPU_HIGH
     resources:
-        mem_mb=lambda wildcards, attempt: (64 * 1024) + (8192 * attempt-1),
-        time_hrs=lambda wildcards, attempt: 12 * attempt
+        mem_mb=lambda wildcards, attempt: (64 * 1024) + (8192 * (attempt - 1)),
+        time_hrs=lambda wildcards, attempt: (24 * attempt) + (12 * (attempt -1 ))
     params:
         out_prefix = lambda wildcards, output: str(output.vcf).rsplit("_",1)[0],
         idx_prefix = lambda wildcards, input: pathlib.Path(input.idx_dir).joinpath(f"{wildcards.ref_genome}_{wildcards.ref_graph}")
