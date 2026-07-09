@@ -57,10 +57,10 @@ rule run_pangenie_genotyping:
         DIR_RSRC.joinpath("30-genotyping", "10_pangenie", "pg_gt", "{sample}.{ref_genome}_{ref_graph}.pg-run.rsrc")
     conda:
         DIR_ENVS.joinpath("pangenie.yaml")
-    threads: CPU_HIGH
+    threads: 16
     resources:
-        mem_mb=lambda wildcards, attempt: (64 * 1024) + (8192 * (attempt - 1)),
-        time_hrs=lambda wildcards, attempt: (23 * attempt) + (24 * (attempt -1 ))
+        mem_mb=lambda wildcards, attempt: (96 * 1024) + ((32 * 1024) * (attempt - 1)),
+        time_hrs=lambda wildcards, attempt: (47 * attempt) + (24 * (attempt -1 ))
     params:
         out_prefix = lambda wildcards, output: str(output.vcf).rsplit("_",1)[0],
         idx_prefix = lambda wildcards, input: pathlib.Path(input.idx_dir).joinpath(f"{wildcards.ref_genome}_{wildcards.ref_graph}")
