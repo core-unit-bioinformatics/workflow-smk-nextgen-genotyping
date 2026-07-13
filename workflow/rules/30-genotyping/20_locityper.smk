@@ -251,6 +251,7 @@ rule preprocess_locityper_reads:
         read_flag = lambda wildcards: (
             "-a" if classify_sample_input_type(wildcards.sample, SAMPLE_INPUT_FILES[wildcards.sample]) == "cram"
             else "-i"
+        ),
         tech_flag = lambda wildcards: f"-t {SAMPLE_TECH[wildcards.sample]}"
     shell:
         "locityper preproc {params.read_flag} {input.reads} -r {input.reference_fasta}"
