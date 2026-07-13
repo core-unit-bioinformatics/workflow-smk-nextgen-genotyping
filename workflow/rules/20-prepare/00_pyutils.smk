@@ -91,7 +91,6 @@ def classify_sample_input_type(sample, sample_files):
 def build_locityper_reads_argument(sample, reads_input):
     """Build the '-i'/'-a' argument for locityper"""
     sample_type = classify_sample_input_type(sample, SAMPLE_INPUT_FILES[sample])
-    write_log_message(sys.stderr, "WARNING", f"build_locityper_reads_argument: sample={sample!r} sample_type={sample_type!r} reads_input={reads_input!r}")
 
     if sample_type == "cram":
         result = f"-a {reads_input[0]}"
@@ -99,5 +98,4 @@ def build_locityper_reads_argument(sample, reads_input):
         files = " ".join(str(f) for f in reads_input)
         result = f"-i {files}"
 
-    write_log_message(sys.stderr, "WARNING", f"build_locityper_reads_argument: returning {result!r}")
     return result
