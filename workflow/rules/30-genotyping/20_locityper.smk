@@ -248,13 +248,12 @@ rule preprocess_locityper_reads:
         mem_mb=lambda wildcards, attempt: (16 * 1024) * attempt + (8 * 1024) * (attempt -1),
         time_hrs=lambda wildcards, attempt: 2 * attempt
     params:
-        read_flag = lambda wildcards: (
-            "-a" if classify_sample_input_type(wildcards.sample, SAMPLE_INPUT_FILES[wildcards.sample]) == "cram"
-            else "-i"
+        reads_arg = lambda wildcards: build_locityper_reads_argument(
+            wildcards.sample, SAMPLE_INPUT_FILES[wildcards.sample]
         ),
         tech_flag = lambda wildcards: f"-t {SAMPLE_TECH[wildcards.sample]}"
     shell:
-        "locityper preproc {params.read_flag} {input.reads} -r {input.reference_fasta}"
+        "locityper preproc {params.reads_arg} -r {input.reference_fasta}"
             " -j {input.jf_counts} {params.tech_flag} -o {output.preproc_dir}"
             " --threads {threads} &> {log}"
 
@@ -292,9 +291,8 @@ rule run_locityper_genotyping:
         mem_mb=lambda wildcards, attempt: (72 * 1024) * attempt + (32 * 1024) * (attempt -1),
         time_hrs=lambda wildcards, attempt: 3 * attempt
     params:
-        read_flag = lambda wildcards: (
-            "-a" if classify_sample_input_type(wildcards.sample, SAMPLE_INPUT_FILES[wildcards.sample]) == "cram"
-            else "-i"
+        reads_arg = lambda wildcards: build_locityper_reads_argument(
+            wildcards.sample, SAMPLE_INPUT_FILES[wildcards.sample]
         ),
         ref_flag = lambda wildcards: (
             f"-r {rules.prepare_locityper_cram_reference_genome.output.genome_fasta}"
@@ -302,7 +300,7 @@ rule run_locityper_genotyping:
             else ""
         )
     shell:
-        "locityper genotype {params.read_flag} {input.reads} -d {input.loci_database}"
+        "locityper genotype {params.reads_arg} -d {input.loci_database}"
             " -p {input.preproc_dir} {params.ref_flag} -o {output.genotype_dir}"
             " --threads {threads} &> {log}"
 

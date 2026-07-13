@@ -38,37 +38,74 @@ def is_cram_file(file_path):
     return str(file_path).lower().endswith(".cram")
 
 
+SINGLE_END_COMPATIBLE_TECH = {"hifi", "ont"}
+
+
 def classify_sample_input_type(sample, sample_files):
     """Classify a sample's input files for use across tools.
-
     Returns one of:
-        "se"   - single-end FASTQ (1 file)
-        "pe"   - paired-end FASTQ (2 files)
-        "cram" - single CRAM alignment file
-        None   - incompatible/unrecognized combination; callers should
-                 skip this sample for whichever tool required this
-                 classification (see e.g. SAMPLES_LOCITYPER)
+        "se"       - single-end FASTQ (1 file)
+        "pe"       - true paired-end FASTQ mates (exactly 2 files)
+        "se-multi" - 2 or more FASTQ files belonging to single-end 
+                     technology (hifi, ont); pooled via streaming
+        "cram"     - single CRAM alignment file
+        None       - incompatible/unrecognized combination; caller should skip
     """
 
+    # check for cram input
     if len(sample_files) == 1 and is_cram_file(sample_files[0]):
         return "cram"
 
     if not all(is_fastq_file(f) for f in sample_files):
-        logout(
-            f"WARNING: sample '{sample}' has input that is neither FASTQ "
-            f"nor a single CRAM file ({sample_files}). Skipped for locityper."
-            
+        write_log_message(
+            sys.stderr, "WARNING",
+            f"sample '{sample}' has input that is neither FASTQ nor a "
+            f"single CRAM file ({sample_files}) - skipping for tools that "
+            "require classified read input (e.g. locityper)."
         )
         return None
 
+    # check for single-end input
     if len(sample_files) == 1:
         return "se"
+
+    tech = SAMPLE_TECH.get(sample)
+
+    # check for single-end compatible technologies that may have multiple FASTQ files
+    if tech in SINGLE_END_COMPATIBLE_TECH:
+        return "se-multi"
+
+    # check for paired-end input
     if len(sample_files) == 2:
         return "pe"
 
-    logout(
-        f"WARNING: sample '{sample}' resolves to {len(sample_files)} input "
-        f"files. Expected 1 (single-end FASTQ or CRAM) or 2 "
-        f"(paired-end FASTQ) files. Skipped for locityper."
+    write_log_message(
+        sys.stderr, "WARNING",
+        f"sample '{sample}' resolves to {len(sample_files)} input files "
+        f"with tech='{tech}' - more than 2 files is only supported for "
+        f"{sorted(SINGLE_END_COMPATIBLE_TECH)} technologies; skipped"
     )
     return None
+
+
+def build_locityper_reads_argument(sample, sample_files):
+    """Build the '-i'/'-a' argument (flag + files) for locityper"""
+
+    sample_type = classify_sample_input_type(sample, sample_files)
+
+    if sample_type == "cram":
+        return f"-a {sample_files[0]}"
+
+    if sample_type in ("se", "pe"):
+        files = " ".join(str(f) for f in sample_files)
+        return f"-i {files}"
+
+    if sample_type == "se-multi":
+        cat_cmd = "zcat" if SAMPLE_COMPRESSED_INPUT[sample] else "cat"
+        files = " ".join(str(f) for f in sample_files)
+        return f"-i <({cat_cmd} {files})"
+
+    raise ValueError(
+        f"Cannot build locityper reads argument for sample '{sample}' "
+        f"(classified as {sample_type!r})"
+    )
