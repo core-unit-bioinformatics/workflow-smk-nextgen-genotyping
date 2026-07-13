@@ -91,7 +91,7 @@ if CRAM_SAMPLES_PRESENT:
                     input.raw_reference, output.genome_fasta, threads
                 )
             shell:
-                "{params.cmd} &> {log}"
+                "{params.cmd} 2> {log}"
 
 
     rule index_locityper_cram_reference_genome:
@@ -216,8 +216,8 @@ rule build_locityper_loci_database:
 
 
 rule concatenate_locityper_multi_reads:
-    """Physically concatenate 2+ FASTQ files belonging to the same
-    single-end/single-molecule sample (hifi, ont) into one temp file."""
+    """Concatenate 2+ FASTQ files belonging to the same
+    single-end sample (hifi, ont) into one temp file."""
     input:
         reads = lambda wildcards: SAMPLE_INPUT_FILES[wildcards.sample]
     output:
@@ -239,7 +239,7 @@ rule concatenate_locityper_multi_reads:
             else f"cat {' '.join(str(f) for f in input.reads)} | gzip -c > {output.combined}"
         )
     shell:
-        "{params.cmd} &> {log}"
+        "{params.cmd} 2> {log}"
 
 
 # per-sample preprocessing + genotyping 
@@ -321,7 +321,7 @@ rule run_locityper_genotyping:
         DIR_ENVS.joinpath("locityper.yaml")
     threads: CPU_HIGH
     resources:
-        mem_mb=lambda wildcards, attempt: (72 * 1024) * attempt + (32 * 1024) * (attempt -1),
+        mem_mb=lambda wildcards, attempt: (128 * 1024) + (32 * 1024) * (attempt -1),
         time_hrs=lambda wildcards, attempt: 3 * attempt
     params:
         reads_arg = lambda wildcards, input: build_locityper_reads_argument(wildcards.sample, input.reads),
