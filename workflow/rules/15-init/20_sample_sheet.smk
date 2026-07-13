@@ -108,3 +108,35 @@ SAMPLE_INPUT_FILES = dict(
 SAMPLE_COMPRESSED_INPUT = dict(
     (sample, all_gzipped) for (sample, (all_gzipped, _)) in _PREP_SAMPLE_INPUT
 )
+
+VALID_SEQUENCING_TECH = {"sr", "hifi", "ont"}
+
+
+def validate_sample_tech(sample, tech):
+    tech = str(tech).strip().lower()
+    if tech not in VALID_SEQUENCING_TECH:
+        err_msg = (
+            f"Error: sample '{sample}' has invalid 'tech' value '{tech}' in "
+            f"the sample sheet - must be one of {sorted(VALID_SEQUENCING_TECH)}."
+        )
+        logerr(err_msg)
+        raise ValueError(err_msg)
+    return tech
+
+
+if RUN_LOCITYPER:
+    if "tech" not in SAMPLE_SHEET.columns:
+        err_msg = (
+            "Error: locityper was selected (tools=...) but the sample sheet "
+            "does not contain a 'tech' column. Please add a 'tech' column "
+            f"with one of {sorted(VALID_SEQUENCING_TECH)} per sample."
+        )
+        logerr(err_msg)
+        raise ValueError(err_msg)
+
+    SAMPLE_TECH = dict(
+        (row.sample, validate_sample_tech(row.sample, row.tech))
+        for row in SAMPLE_SHEET.itertuples()
+    )
+else:
+    SAMPLE_TECH = {}
