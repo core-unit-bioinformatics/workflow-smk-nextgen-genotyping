@@ -88,24 +88,12 @@ def classify_sample_input_type(sample, sample_files):
     return None
 
 
-def build_locityper_reads_argument(sample, sample_files):
-    """Build the '-i'/'-a' argument (flag + files) for locityper"""
-
-    sample_type = classify_sample_input_type(sample, sample_files)
+def build_locityper_reads_argument(sample, reads_input):
+    """Build the '-i'/'-a' argument for locityper"""
+    sample_type = classify_sample_input_type(sample, SAMPLE_INPUT_FILES[sample])
 
     if sample_type == "cram":
-        return f"-a {sample_files[0]}"
+        return f"-a {reads_input[0]}"
 
-    if sample_type in ("se", "pe"):
-        files = " ".join(str(f) for f in sample_files)
-        return f"-i {files}"
-
-    if sample_type == "se-multi":
-        cat_cmd = "zcat" if SAMPLE_COMPRESSED_INPUT[sample] else "cat"
-        files = " ".join(str(f) for f in sample_files)
-        return f"-i <({cat_cmd} {files})"
-
-    raise ValueError(
-        f"Cannot build locityper reads argument for sample '{sample}' "
-        f"(classified as {sample_type!r})"
-    )
+    files = " ".join(str(f) for f in reads_input)
+    return f"-i {files}"
