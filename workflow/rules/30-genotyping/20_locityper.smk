@@ -262,7 +262,11 @@ rule preprocess_locityper_reads:
             if classify_sample_input_type(wildcards.sample, SAMPLE_INPUT_FILES[wildcards.sample]) == "cram"
             else rules.prepare_linear_reference_genome.output.genome_fasta
         ),
-        genome_index = rules.index_locityper_reference_genome.output.genome_index,
+        genome_index = lambda wildcards: (
+            rules.index_locityper_cram_reference_genome.output.genome_index
+            if classify_sample_input_type(wildcards.sample, SAMPLE_INPUT_FILES[wildcards.sample]) == "cram"
+            else rules.index_locityper_reference_genome.output.genome_index
+        ),
         jf_counts = rules.count_locityper_reference_kmers.output.jf_counts
     output:
         preproc_dir = directory(
@@ -291,6 +295,7 @@ rule run_locityper_genotyping:
     """Run 'locityper genotype' (handles single-end FASTQ,
     paired-end FASTQ, and CRAM input)."""
     input:
+        input:
         reads = lambda wildcards: (
             expand(rules.concatenate_locityper_multi_reads.output.combined, sample=[wildcards.sample])
             if classify_sample_input_type(wildcards.sample, SAMPLE_INPUT_FILES[wildcards.sample]) == "se-multi"
@@ -298,6 +303,16 @@ rule run_locityper_genotyping:
         ),
         alignment_index = lambda wildcards: (
             expand(rules.index_locityper_cram_alignment.output.alignment_index, sample=[wildcards.sample])
+            if classify_sample_input_type(wildcards.sample, SAMPLE_INPUT_FILES[wildcards.sample]) == "cram"
+            else []
+        ),
+        reference_fasta = lambda wildcards: (
+            rules.prepare_locityper_cram_reference_genome.output.genome_fasta
+            if classify_sample_input_type(wildcards.sample, SAMPLE_INPUT_FILES[wildcards.sample]) == "cram"
+            else []
+        ),
+        genome_index = lambda wildcards: (
+            rules.index_locityper_cram_reference_genome.output.genome_index
             if classify_sample_input_type(wildcards.sample, SAMPLE_INPUT_FILES[wildcards.sample]) == "cram"
             else []
         ),
@@ -325,8 +340,8 @@ rule run_locityper_genotyping:
         time_hrs=lambda wildcards, attempt: 3 * attempt
     params:
         reads_arg = lambda wildcards, input: build_locityper_reads_argument(wildcards.sample, input.reads),
-        ref_flag = lambda wildcards: (
-            f"-r {rules.prepare_locityper_cram_reference_genome.output.genome_fasta}"
+        ref_flag = lambda wildcards, input: (
+            f"-r {input.reference_fasta}"
             if classify_sample_input_type(wildcards.sample, SAMPLE_INPUT_FILES[wildcards.sample]) == "cram"
             else ""
         )
