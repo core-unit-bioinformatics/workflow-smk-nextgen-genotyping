@@ -1,0 +1,20 @@
+GROUP	VAR_COUNT	PERCENTAGE
+
+# overview
+total_variants	27456041	
+missing_in_all_3	4579	0.02
+missing_in_both_short_not_hifi	1527	0.01
+missing_in_hifi_not_both_short	4128	0.02
+identical_in_all_3	27284059	99.37
+
+# match matrix (cell = count and percentage of total variants)
+GROUP	HG00733_hifi_hgsvc	HG00733_short_nygc	HG00733_short_wustl
+HG00733_hifi_hgsvc	-	27348108 (99.61%)	27316962 (99.49%)
+HG00733_short_nygc	27348108 (99.61%)	-	27345466 (99.60%)
+HG00733_short_wustl	27316962 (99.49%)	27345466 (99.60%)	-
+
+# mismatch matrix (cell = count and percentage of total variants)
+GROUP	HG00733_hifi_hgsvc	HG00733_short_nygc	HG00733_short_wustl
+HG00733_hifi_hgsvc	-	97699 (0.36%)	128845 (0.47%)
+HG00733_short_nygc	97699 (0.36%)	-	100341 (0.37%)
+HG00733_short_wustl	128845 (0.47%)	100341 (0.37%)	-
