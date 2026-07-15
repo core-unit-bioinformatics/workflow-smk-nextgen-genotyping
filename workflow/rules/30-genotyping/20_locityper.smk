@@ -113,11 +113,29 @@ if CRAM_SAMPLES_PRESENT:
             "samtools faidx {input.genome_fasta} &> {log}"
 
 
-rule index_locityper_cram_alignment:
-    """samtools index for CRAM input samples - required before locityper
-    preproc/genotype can read the alignment."""
+rule link_locityper_cram_alignment:
+    """Symlink the CRAM so its .crai index can be
+    written as a sibling file next to it."""
     input:
         alignment = lambda wildcards: SAMPLE_INPUT_FILES[wildcards.sample][0]
+    output:
+        alignment_link = DIR_PROC.joinpath(
+            "30-genotyping", "20_locityper", "lt_cram", "{sample}.cram"
+        )
+    log:
+        DIR_LOG.joinpath("30-genotyping", "20_locityper", "lt_cram", "{sample}.cram-link.log")
+    threads: CPU_LOW
+    resources:
+        mem_mb=lambda wildcards, attempt: 512 * attempt,
+        time_hrs=lambda wildcards, attempt: attempt
+    shell:
+        "ln -s {input.alignment} {output.alignment_link} 2> {log}"
+
+
+rule index_locityper_cram_alignment:
+    """samtools index for CRAM input samples. Indexes the symlinked copy"""
+    input:
+        alignment = rules.link_locityper_cram_alignment.output.alignment_link
     output:
         alignment_index = DIR_PROC.joinpath(
             "30-genotyping", "20_locityper", "lt_cram", "{sample}.cram.crai"
@@ -250,6 +268,8 @@ rule preprocess_locityper_reads:
         reads = lambda wildcards: (
             expand(rules.concatenate_locityper_multi_reads.output.combined, sample=[wildcards.sample])
             if classify_sample_input_type(wildcards.sample, SAMPLE_INPUT_FILES[wildcards.sample]) == "se-multi"
+            else expand(rules.link_locityper_cram_alignment.output.alignment_link, sample=[wildcards.sample])
+            if classify_sample_input_type(wildcards.sample, SAMPLE_INPUT_FILES[wildcards.sample]) == "cram"
             else SAMPLE_INPUT_FILES[wildcards.sample]
         ),
         alignment_index = lambda wildcards: (
@@ -298,6 +318,8 @@ rule run_locityper_genotyping:
         reads = lambda wildcards: (
             expand(rules.concatenate_locityper_multi_reads.output.combined, sample=[wildcards.sample])
             if classify_sample_input_type(wildcards.sample, SAMPLE_INPUT_FILES[wildcards.sample]) == "se-multi"
+            else expand(rules.link_locityper_cram_alignment.output.alignment_link, sample=[wildcards.sample])
+            if classify_sample_input_type(wildcards.sample, SAMPLE_INPUT_FILES[wildcards.sample]) == "cram"
             else SAMPLE_INPUT_FILES[wildcards.sample]
         ),
         alignment_index = lambda wildcards: (
