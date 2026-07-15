@@ -295,7 +295,6 @@ rule run_locityper_genotyping:
     """Run 'locityper genotype' (handles single-end FASTQ,
     paired-end FASTQ, and CRAM input)."""
     input:
-        input:
         reads = lambda wildcards: (
             expand(rules.concatenate_locityper_multi_reads.output.combined, sample=[wildcards.sample])
             if classify_sample_input_type(wildcards.sample, SAMPLE_INPUT_FILES[wildcards.sample]) == "se-multi"
