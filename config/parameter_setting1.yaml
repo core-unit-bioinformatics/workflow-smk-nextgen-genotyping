@@ -32,7 +32,7 @@ reference_callset:
 # https://zenodo.org/records/11068261
 loci_catalog:
   label: lociset
-  path: /gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/wd/input_data/loci.bed
+  path: /gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/wd/input_data/2026-07-16-MODY_gene-list.bed
   
 # The CRAM reference genome (locityper) is expected to be in fasta format, and may optionally be gzipped.
 # Valid example input file:
