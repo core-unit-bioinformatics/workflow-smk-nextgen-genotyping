@@ -409,7 +409,7 @@ rule merge_locityper_genotypes_to_csv:
     benchmark:
         DIR_RSRC.joinpath(
             "30-genotyping", "20_locityper", "lt_csv",
-            "{ref_genome}_{ref_graph}_{ref_loci}.into-csv.rsrc"
+            "SAMPLES.{ref_genome}_{ref_graph}_{ref_loci}.into-csv.rsrc"
         )
     conda:
         DIR_ENVS.joinpath("locityper.yaml")
