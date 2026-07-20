@@ -15,7 +15,7 @@ if not SAMPLES_PANGENIE:
     raise ValueError(err_msg)
 
 
-rule run_pangenie_indexing:
+rule index_pangenie_genome_and_graph:
     input:
         genome = rules.prepare_linear_reference_genome.output.genome_fasta,
         graph = rules.prepare_pangenome_reference_graph.output.graph_vcf
@@ -46,7 +46,7 @@ rule run_pangenie_indexing:
 rule run_pangenie_genotyping:
     input:
         reads =  rules.prepare_sample_input_reads.output.reads,
-        idx_dir = rules.run_pangenie_indexing.output.idx_dir
+        idx_dir = rules.index_pangenie_genome_and_graph.output.idx_dir
     output:
         vcf = temp(
             DIR_PROC.joinpath("30-genotyping", "10_pangenie", "pg_gt", "{sample}.{ref_genome}_{ref_graph}_genotyping.vcf")
