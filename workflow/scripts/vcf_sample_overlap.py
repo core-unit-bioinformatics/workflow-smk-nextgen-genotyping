@@ -16,10 +16,6 @@ Compare genotypes across a merged VCF containing 3 samples
   2. For all remaining variants, compare each of the 3 sample pairs
      (short1-short2, short1-hifi, short2-hifi) and count matches 
      (allele order ignored, since input is unphased) vs. mismatches.
-  3. For ALL variants, produce a 4x4 confusion matrix for each 
-     sample pair, with the categories: 0/0, 0/1, 1/1, ./.
-  4. Extract variants present in BOTH short-read samples only
-     and variants present in HiFi only. 
 
 Produces a TSV with overview stats plus match/mismatch matrices
 """
@@ -40,7 +36,8 @@ def open_vcf(path):
 
 
 def open_output_vcf(path):
-    """Open an output VCF for writing."""
+    """Open an output VCF for writing, gzip-compressed if the path
+    ends in .gz, plain text otherwise."""
     if path.endswith(".gz"):
         return gzip.open(path, "wt")
     return open(path, "w")
@@ -106,8 +103,11 @@ GENOTYPE_CATEGORIES = ["0/0", "0/1", "1/1", "./."]
 
 def genotype_category(gt_tuple):
     """Map a normalized genotype tuple to one of the 4 confusion-matrix
-    categories. A genotype that isn't 0/0, 0/1, or 1/1 (e.g. a multi-
-    allelic call like 1/2) is returned as 'other' and reported separately."""
+    categories. Any genotype containing a missing allele (including
+    partially-missing, e.g. '0/.') is bucketed as './.'. A genotype
+    that isn't 0/0, 0/1, or 1/1 (e.g. a multi-allelic call like 1/2)
+    is returned as 'other' and reported separately - not expected for
+    biallelic-converted PanGenie/locityper output."""
     if is_missing(gt_tuple):
         return "./."
     label = "/".join(gt_tuple)
@@ -195,7 +195,7 @@ def scan_vcf(vcf_path, out_short=None, out_hifi=None):
                     (short2, hifi, gt_short2, gt_hifi),
                 ]
 
-                # confusion matrix. every variant, regardless of missingness 
+                # confusion matrix. every variant, regardless of missingness
                 for name_a, name_b, gt_a, gt_b in pair_genotypes:
                     cat_a = genotype_category(gt_a)
                     cat_b = genotype_category(gt_b)
@@ -329,11 +329,15 @@ def write_matrix(out, samples, pair_counts, total):
         out.write(row_sample + "\t" + "\t".join(row_cells) + "\n")
 
 
-def write_confusion_matrix(out, row_sample, col_sample, counts):
+def write_confusion_matrix(out, row_sample, col_sample, counts, total):
     out.write(f"\n# confusion matrix: {row_sample} (rows) vs {col_sample} (columns)\n")
-    out.write("GENOTYPE\t" + "\t".join(GENOTYPE_CATEGORIES) + "\n")
+    out.write("GT\t" + "\t".join(GENOTYPE_CATEGORIES) + "\n")
     for cat_row in GENOTYPE_CATEGORIES:
-        row_cells = [str(counts[(cat_row, cat_col)]) for cat_col in GENOTYPE_CATEGORIES]
+        row_cells = []
+        for cat_col in GENOTYPE_CATEGORIES:
+            count = counts[(cat_row, cat_col)]
+            pct = pct_of(count, total)
+            row_cells.append(f"{count} ({pct:.2f}%)")
         out.write(cat_row + "\t" + "\t".join(row_cells) + "\n")
 
 
@@ -374,7 +378,7 @@ def write_tsv(path, stats, remaining):
             (stats["short1"], stats["hifi"]),
             (stats["short2"], stats["hifi"]),
         ]:
-            write_confusion_matrix(out, name_a, name_b, stats["confusion_counts"][(name_a, name_b)])
+            write_confusion_matrix(out, name_a, name_b, stats["confusion_counts"][(name_a, name_b)], total)
 
 
 def print_report(stats):
