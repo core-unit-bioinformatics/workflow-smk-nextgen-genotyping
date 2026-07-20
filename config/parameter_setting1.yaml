@@ -17,7 +17,7 @@ linear_reference_genome:
 # https://s3-us-west-2.amazonaws.com/human-pangenomics/pangenomes/scratch/2025_02_28_minigraph_cactus/hprc-v2.0-mc-grch38/hprc-v2.0-mc-grch38.pgin.vcf.gz
 # https://s3-us-west-2.amazonaws.com/human-pangenomics/index.html?prefix=pangenomes/scratch/2025_12_23_minigraph_cactus/hprc-v2.1-mc-grch38/hprc-v2.1-mc-grch38.vcf.gz
 pangenome_reference_graph:
-  label: hprc2-1grch38graph
+  label: hprc21grch38graph
   path: /gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/wd/input_data/hprc-v2.1-mc-grch38.vcf.gz
 
 # The reference callset  (pangenie)is expected to be in vcf format, and may optionally be gzipped.
@@ -25,7 +25,7 @@ pangenome_reference_graph:
 # https://s3-us-west-2.amazonaws.com/human-pangenomics/pangenomes/scratch/2025_02_28_minigraph_cactus/hprc-v2.0-mc-grch38/hprc-v2.0-mc-grch38.pgbi.vcf.gz
 # https://s3-us-west-2.amazonaws.com/human-pangenomics/index.html?prefix=pangenomes/scratch/2025_12_23_minigraph_cactus/hprc-v2.1-mc-grch38/hprc-v2.1-mc-grch38.wave.vcf.gz
 reference_callset:
-  label: hprc2-1grch38callset
+  label: hprc21grch38callset
   path: /gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/wd/input_data/hprc-v2.1-mc-grch38.wave.vcf.gz
 
 # The loci catalog  (locityper)is expected to be in bed format. Tab separated, with 3 columns: 
