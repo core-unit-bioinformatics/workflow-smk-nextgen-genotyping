@@ -1,9 +1,5 @@
 import pathlib
 
-# Not every sample in the sample sheet is necessarily usable by
-# locityper (it requires FASTQ input and 1 or 2 files per sample).
-# Incompatible samples are skipped here (with a warning) but remain
-# unaffected for other tools such as pangenie.
 
 SAMPLES_LOCITYPER = [
     sample for sample in SAMPLES
@@ -60,7 +56,7 @@ rule index_locityper_reference_genome:
         DIR_ENVS.joinpath("locityper.yaml")
     threads: CPU_LOW
     resources:
-        mem_mb=lambda wildcards, attempt: 4096 * attempt,
+        mem_mb=lambda wildcards, attempt: (4 * 1024) * attempt,
         time_hrs=lambda wildcards, attempt: 2 * attempt
     shell:
         "samtools faidx {input.genome_fasta} &> {log}"
@@ -85,7 +81,7 @@ if CRAM_SAMPLES_PRESENT:
             threads: CPU_LOW
             resources:
                 mem_mb=lambda wildcards, attempt: 2048 * attempt,
-                time_hrs=lambda wildcards, attempt: attempt
+                time_hrs=lambda wildcards, attempt: 2 * attempt
             params:
                 cmd = lambda wildcards, threads, input, output: select_prepare_gzipped_reference_command(
                     input.raw_reference, output.genome_fasta, threads
@@ -107,8 +103,8 @@ if CRAM_SAMPLES_PRESENT:
             DIR_ENVS.joinpath("locityper.yaml")
         threads: CPU_LOW
         resources:
-            mem_mb=lambda wildcards, attempt: 1024 * attempt,
-            time_hrs=lambda wildcards, attempt: attempt
+            mem_mb=lambda wildcards, attempt: 2048 * attempt,
+            time_hrs=lambda wildcards, attempt: 2 * attempt
         shell:
             "samtools faidx {input.genome_fasta} &> {log}"
 
@@ -126,8 +122,8 @@ rule link_locityper_cram_alignment:
         DIR_LOG.joinpath("30-genotyping", "20_locityper", "lt_cram", "{sample}.cram-link.log")
     threads: CPU_LOW
     resources:
-        mem_mb=lambda wildcards, attempt: 512 * attempt,
-        time_hrs=lambda wildcards, attempt: attempt
+        mem_mb=lambda wildcards, attempt: 2048 * attempt,
+        time_hrs=lambda wildcards, attempt: 2 * attempt
     shell:
         "ln -s {input.alignment} {output.alignment_link} 2> {log}"
 
@@ -149,7 +145,7 @@ rule index_locityper_cram_alignment:
     threads: CPU_LOW
     resources:
         mem_mb=lambda wildcards, attempt: 2048 * attempt,
-        time_hrs=lambda wildcards, attempt: attempt
+        time_hrs=lambda wildcards, attempt: 2 * attempt
     shell:
         "samtools index -o {output.alignment_index} --threads {threads} {input.alignment} &> {log}"
 
@@ -170,7 +166,7 @@ rule count_locityper_reference_kmers:
     threads: CPU_MEDIUM
     resources:
         mem_mb=lambda wildcards, attempt: (32 * 1024) * attempt,
-        time_hrs=lambda wildcards, attempt: 4 * attempt
+        time_hrs=lambda wildcards, attempt: 2 * attempt
     shell:
         "jellyfish count --canonical --lower-count 2 --out-counter-len 2"
             " --mer-len 25 --threads {threads} --size 3G"
@@ -194,9 +190,10 @@ rule filter_pangenome_graph_overlaps:
         DIR_RSRC.joinpath("30-genotyping", "20_locityper", "lt_ref", "{ref_graph}.vcfbub.rsrc")
     conda:
         DIR_ENVS.joinpath("locityper.yaml")
+    threads: CPU_LOW
     resources:
-        mem_mb=lambda wildcards, attempt: 4096 * attempt,
-        time_hrs=lambda wildcards, attempt: 2 * attempt
+        mem_mb=lambda wildcards, attempt: (4 * 1024) * attempt,
+        time_hrs=lambda wildcards, attempt: 4 * attempt
     shell:
         "vcfbub -l 0 -i {input.graph_vcf} 2> {log} | bgzip > {output.filtered_graph}"
             " && "
@@ -223,9 +220,9 @@ rule build_locityper_loci_database:
         DIR_RSRC.joinpath("30-genotyping", "20_locityper", "lt_db", "{ref_genome}_{ref_graph}_{ref_loci}.target.rsrc")
     conda:
         DIR_ENVS.joinpath("locityper.yaml")
-    threads: CPU_MEDIUM
+    threads: CPU_LOW
     resources:
-        mem_mb=lambda wildcards, attempt: 16384 * attempt,
+        mem_mb=lambda wildcards, attempt: (8 * 1024) * attempt,
         time_hrs=lambda wildcards, attempt: 4 * attempt
     shell:
         "locityper target -d {output.loci_db} -v {input.filtered_graph}"
@@ -248,7 +245,7 @@ rule concatenate_locityper_multi_reads:
         DIR_RSRC.joinpath("30-genotyping", "20_locityper", "lt_cat", "{sample}.cat.rsrc")
     threads: CPU_LOW
     resources:
-        mem_mb=lambda wildcards, attempt: 1024 * attempt,
+        mem_mb=lambda wildcards, attempt: 2048 * attempt,
         time_hrs=lambda wildcards, attempt: 2 * attempt
     params:
         cmd = lambda wildcards, input, output: (
@@ -298,9 +295,9 @@ rule preprocess_locityper_reads:
         DIR_RSRC.joinpath("30-genotyping", "20_locityper", "lt_pre", "{sample}.{ref_genome}.preproc.rsrc")
     conda:
         DIR_ENVS.joinpath("locityper.yaml")
-    threads: CPU_MEDIUM
+    threads: CPU_LOW
     resources:
-        mem_mb=lambda wildcards, attempt: (32 * 1024) + (16 * 1024) * (attempt -1),
+        mem_mb=lambda wildcards, attempt: (32 * 1024) + ((16 * 1024) * (attempt -1)),
         time_hrs=lambda wildcards, attempt: 2 * attempt
     params:
         reads_arg = lambda wildcards, input: build_locityper_reads_argument(wildcards.sample, input.reads),
@@ -355,10 +352,10 @@ rule run_locityper_genotyping:
         )
     conda:
         DIR_ENVS.joinpath("locityper.yaml")
-    threads: CPU_HIGH
+    threads: CPU_MEDIUM
     resources:
-        mem_mb=lambda wildcards, attempt: (128 * 1024) + (32 * 1024) * (attempt -1),
-        time_hrs=lambda wildcards, attempt: 3 * attempt
+        mem_mb=lambda wildcards, attempt: (96 * 1024) + ((32 * 1024) * (attempt - 1)),
+        time_hrs=lambda wildcards, attempt: 4 * attempt
     params:
         reads_arg = lambda wildcards, input: build_locityper_reads_argument(wildcards.sample, input.reads),
         ref_flag = lambda wildcards, input: (
