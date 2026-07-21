@@ -17,7 +17,7 @@ linear_reference_genome:
 # https://s3-us-west-2.amazonaws.com/human-pangenomics/pangenomes/scratch/2025_02_28_minigraph_cactus/hprc-v2.0-mc-grch38/hprc-v2.0-mc-grch38.pgin.vcf.gz
 # https://s3-us-west-2.amazonaws.com/human-pangenomics/index.html?prefix=pangenomes/scratch/2025_12_23_minigraph_cactus/hprc-v2.1-mc-grch38/hprc-v2.1-mc-grch38.vcf.gz
 pangenome_reference_graph:
-  label: hprc21grch38graph
+  label: hprc2grch38graph
   path: /gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/wd/input_data/hprc-v2.0-mc-grch38.pgin.vcf.gz
 #  path: /gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/wd/input_data/hprc-v2.1-mc-grch38.vcf.gz
 
@@ -26,7 +26,7 @@ pangenome_reference_graph:
 # https://s3-us-west-2.amazonaws.com/human-pangenomics/pangenomes/scratch/2025_02_28_minigraph_cactus/hprc-v2.0-mc-grch38/hprc-v2.0-mc-grch38.pgbi.vcf.gz
 # https://s3-us-west-2.amazonaws.com/human-pangenomics/index.html?prefix=pangenomes/scratch/2025_12_23_minigraph_cactus/hprc-v2.1-mc-grch38/hprc-v2.1-mc-grch38.wave.vcf.gz
 reference_callset:
-  label: hprc21grch38callset
+  label: hprc2grch38callset
   path: /gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/wd/input_data/hprc-v2.0-mc-grch38.pgbi.vcf.gz
 #  path: /gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/wd/input_data/hprc-v2.1-mc-grch38.wave.vcf.gz
 
