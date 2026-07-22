@@ -62,6 +62,9 @@ def get_or_nan(res, key):
     return np.nan if val is None else val
 
 
+NA_ROW = '\t'.join(['NO_TYPE_FOUND', 'NA', 'NA', 'NA', 'NA', 'NA']) + '\n'
+
+
 def process_sample(sample, sample_dir):
     s = ''
     for entry in os.scandir(os.path.join(sample_dir, 'loci')):
@@ -70,6 +73,14 @@ def process_sample(sample, sample_dir):
         locus = entry.name
 
         json_filename = os.path.join(entry.path, 'res.json.gz')
+        if not os.path.exists(json_filename):
+            sys.stderr.write(
+                f'WARN: Missing {json_filename} - locus genotyping likely '
+                f'failed for {sample}/{locus}, marking as NO_TYPE_FOUND\n'
+            )
+            s += f'{sample}\t{locus}\t{NA_ROW}'
+            continue
+
         with gzip.open(json_filename, 'rt') as inp:
             try:
                 res = json.load(inp)
