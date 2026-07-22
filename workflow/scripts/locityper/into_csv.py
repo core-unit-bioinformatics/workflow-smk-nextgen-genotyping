@@ -89,7 +89,7 @@ def process_sample(sample, sample_dir):
                 raise
             s += f'{sample}\t{locus}\t'
             if 'genotype' not in res:
-                s += '*\n'
+                s += NA_ROW
                 continue
 
             try:
