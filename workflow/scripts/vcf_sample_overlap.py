@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# example run: vcf_sample_overlap.py path/to/merged.vcf.gz --out summary.tsv
+# example run: ./workflow/scripts/vcf_sample_overlap.py results/SAMPLES.hg38_hprc21grch38graph_hprc21grch38callset.pg-gt-bi.vcf.gz --out results/SAMPLES.hg38_hprc21grch38graph_hprc21grch38callset.pg-gt-bi_Stats.tsv --out-short results/SAMPLES.hg38_hprc21grch38graph_hprc21grch38callset.pg-gt-bi.short.vcf --out-hifi results/SAMPLES.hg38_hprc21grch38graph_hprc21grch38callset.pg-gt-bi.hifi.vcf
 
 """
 vcf_sample_overlap.py
@@ -16,6 +16,9 @@ Compare genotypes across a merged VCF containing 3 samples
   2. For all remaining variants, compare each of the 3 sample pairs
      (short1-short2, short1-hifi, short2-hifi) and count matches 
      (allele order ignored, since input is unphased) vs. mismatches.
+  3. Create a 4x4 confusion matrix for each sample pair.
+  4. save variants present in BOTH short-read samples but missing in HiFi
+     to a VCF (if --out-short is given) and vice versa (if --out-hifi is given).
 
 Produces a TSV with overview stats plus match/mismatch matrices
 """
