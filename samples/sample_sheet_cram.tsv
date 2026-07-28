@@ -1,3 +1,4 @@
  
 sample	input_path	tech
-25D136-98_recal	/gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/wd/input_data/25D136-98.recal.cram	sr
+25D136_cram	/gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/wd/input_data/25D136-98.recal.cram	sr
+25D136_fastq	/gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/workflow-smk-nextgen-genotyping/samples/25D136-98_shortwgs_fastq.fofn	sr
