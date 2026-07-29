@@ -325,7 +325,7 @@ rule preprocess_locityper_reads:
         jf_counts = rules.count_locityper_reference_kmers.output.jf_counts
     output:
         preproc_dir = directory(
-            DIR_PROC.joinpath("30-genotyping", "20_locityper", "lt_pre", "{sample}.{ref_genome}_reads-test")
+            DIR_PROC.joinpath("30-genotyping", "20_locityper", "lt_pre", "{sample}.{ref_genome}")
         )
     log:
         DIR_LOG.joinpath("30-genotyping", "20_locityper", "lt_pre", "{sample}.{ref_genome}.preproc.log")
