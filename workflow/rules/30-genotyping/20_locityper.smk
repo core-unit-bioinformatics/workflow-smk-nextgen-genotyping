@@ -257,6 +257,41 @@ rule concatenate_locityper_multi_reads:
         "{params.cmd} 2> {log}"
 
 
+rule concatenate_locityper_paired_multi_reads:
+    """Concatenate a sample's multiple R1 files into one file and its
+    multiple R2 files into another, preserving R1/R2 pairing order."""
+    input:
+        mate1_reads = lambda wildcards: classify_paired_multi_files(SAMPLE_INPUT_FILES[wildcards.sample])[0],
+        mate2_reads = lambda wildcards: classify_paired_multi_files(SAMPLE_INPUT_FILES[wildcards.sample])[1]
+    output:
+        combined_r1 = temp(DIR_PROC.joinpath(
+            "30-genotyping", "20_locityper", "lt_cat", "{sample}.R1.combined-tmp.fastq.gz"
+        )),
+        combined_r2 = temp(DIR_PROC.joinpath(
+            "30-genotyping", "20_locityper", "lt_cat", "{sample}.R2.combined-tmp.fastq.gz"
+        ))
+    log:
+        DIR_LOG.joinpath("30-genotyping", "20_locityper", "lt_cat", "{sample}.cat-pe.log")
+    benchmark:
+        DIR_RSRC.joinpath("30-genotyping", "20_locityper", "lt_cat", "{sample}.cat-pe.rsrc")
+    threads: CPU_LOW
+    resources:
+        mem_mb=lambda wildcards, attempt: 2048 * attempt,
+        time_hrs=lambda wildcards, attempt: 2 * attempt
+    params:
+        cmd = lambda wildcards, input, output: (
+            f"cat {' '.join(str(f) for f in input.mate1_reads)} > {output.combined_r1}"
+            f" && cat {' '.join(str(f) for f in input.mate2_reads)} > {output.combined_r2}"
+            if SAMPLE_COMPRESSED_INPUT[wildcards.sample]
+            else (
+                f"cat {' '.join(str(f) for f in input.mate1_reads)} | gzip -c > {output.combined_r1}"
+                f" && cat {' '.join(str(f) for f in input.mate2_reads)} | gzip -c > {output.combined_r2}"
+            )
+        )
+    shell:
+        "{params.cmd} 2> {log}"
+
+
 # per-sample preprocessing + genotyping 
 rule preprocess_locityper_reads:
     """Run 'locityper preproc' (handles single-end FASTQ,
@@ -265,6 +300,9 @@ rule preprocess_locityper_reads:
         reads = lambda wildcards: (
             expand(rules.concatenate_locityper_multi_reads.output.combined, sample=[wildcards.sample])
             if classify_sample_input_type(wildcards.sample, SAMPLE_INPUT_FILES[wildcards.sample]) == "se-multi"
+            else expand(rules.concatenate_locityper_paired_multi_reads.output.combined_r1, sample=[wildcards.sample])
+                + expand(rules.concatenate_locityper_paired_multi_reads.output.combined_r2, sample=[wildcards.sample])
+            if classify_sample_input_type(wildcards.sample, SAMPLE_INPUT_FILES[wildcards.sample]) == "pe-multi"
             else expand(rules.link_locityper_cram_alignment.output.alignment_link, sample=[wildcards.sample])
             if classify_sample_input_type(wildcards.sample, SAMPLE_INPUT_FILES[wildcards.sample]) == "cram"
             else SAMPLE_INPUT_FILES[wildcards.sample]
@@ -315,6 +353,9 @@ rule run_locityper_genotyping:
         reads = lambda wildcards: (
             expand(rules.concatenate_locityper_multi_reads.output.combined, sample=[wildcards.sample])
             if classify_sample_input_type(wildcards.sample, SAMPLE_INPUT_FILES[wildcards.sample]) == "se-multi"
+            else expand(rules.concatenate_locityper_paired_multi_reads.output.combined_r1, sample=[wildcards.sample])
+                + expand(rules.concatenate_locityper_paired_multi_reads.output.combined_r2, sample=[wildcards.sample])
+            if classify_sample_input_type(wildcards.sample, SAMPLE_INPUT_FILES[wildcards.sample]) == "pe-multi"
             else expand(rules.link_locityper_cram_alignment.output.alignment_link, sample=[wildcards.sample])
             if classify_sample_input_type(wildcards.sample, SAMPLE_INPUT_FILES[wildcards.sample]) == "cram"
             else SAMPLE_INPUT_FILES[wildcards.sample]
