@@ -1,6 +1,13 @@
 import pathlib
 
 
+# Prevents ambiguous wildcard matching between concatenate_locityper_multi_reads
+# ("{sample}.combined-tmp.fastq.gz") and concatenate_locityper_paired_multi_reads
+# ("{sample}.R1/R2.combined-tmp.fastq.gz") -
+wildcard_constraints:
+    sample = r"[^./]+"
+
+
 SAMPLES_LOCITYPER = [
     sample for sample in SAMPLES
     if classify_sample_input_type(sample, SAMPLE_INPUT_FILES[sample]) is not None
