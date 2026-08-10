@@ -36,7 +36,7 @@ Add info here - be concise, and provide more details in [the workflow documentat
 
 ## Produced output data
 
-Next to different intermediate files
+Next to different intermediate files the following main output files are generated:
 path | meaning
 :--- | :---
 ../wd/results/genotypes/by-sample/pangenie | per-sample data of the pangenie output of all processed samples
