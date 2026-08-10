@@ -36,8 +36,10 @@ Add info here - be concise, and provide more details in [the workflow documentat
 
 ## Produced output data
 
+Next to different intermediate files
 path | meaning
 :--- | :---
+../wd/results/genotypes/by-sample/pangenie | per-sample data of the pangenie output of all processed samples
 ../wd/results/genotypes/merged/pangenie | merged data of the pangenie output of all processed samples
 ../wd/results/genotypes/merged/locityper | merged data of the locityper output of all processed samples
 
