@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+__developer__ = "Timofey_Prodanov"
+__maintainer__ = "CUBI"
+__source__ = "https://github.com/tprodanov/locityper/tree/main/extra"
+
 import argparse
 from collections import defaultdict
 import itertools
@@ -8,7 +12,6 @@ import operator
 import os
 import re
 import numpy as np
-
 import common
 
 
@@ -309,7 +312,7 @@ def main():
     distances = Distances(args.discarded, args.input)
 
     max_entries = args.max_entries or sys.maxsize
-    with common.open(args.output, 'wt') as out:
+    with common.open(args.output, 'ww') as out:
         out.write(f'# {" ".join(sys.argv)}\n')
         out.write('target\tquery\tloo\tedit_dist\taln_size\tdivergence\tqv\n')
         calc_gt_distances(genotypes, distances, out, max_entries)
