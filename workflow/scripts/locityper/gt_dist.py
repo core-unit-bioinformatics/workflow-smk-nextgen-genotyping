@@ -128,7 +128,20 @@ class Distances:
         return len(self.group(hap))
 
     def get_sample_haplotypes(self, sample):
-        return self.sample_haps.get(sample, ())
+        if sample in self.sample_haps:
+            return self.sample_haps[sample]
+
+        # allow sample names with a suffix behind the base individual ID
+        # (e.g. "HG00733_short_nygc" matching haplotype prefix "HG00733"),
+        best_match = None
+        for base_id in self.sample_haps:
+            if sample.startswith(base_id + '_'):
+                if best_match is None or len(base_id) > len(best_match):
+                    best_match = base_id
+        if best_match is not None:
+            return self.sample_haps[best_match]
+
+        return ()
 
     def all_distances(self, genotype):
         hap_dists = []
