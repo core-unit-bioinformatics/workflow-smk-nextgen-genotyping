@@ -9,7 +9,7 @@
 # https://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/HGSVC2/technical/reference/20200513_hg38_NoALT/hg38.no_alt.fa.gz
 linear_reference_genome:
   label: hg38
-  path: /gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/wd/input_data/hg38.no_alt.fa.gz
+  path: /gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/workdirs/wd/input_data/hg38.no_alt.fa.gz
   
 # The pangenome reference graph (pangenie, locityper) is expected to be a variation graph in vcf format,
 # and may optionally be gzipped.
@@ -17,16 +17,16 @@ linear_reference_genome:
 # https://s3-us-west-2.amazonaws.com/human-pangenomics/pangenomes/scratch/2025_02_28_minigraph_cactus/hprc-v2.0-mc-grch38/hprc-v2.0-mc-grch38.pgin.vcf.gz
 pangenome_reference_graph:
   label: hprc21grch38graph
-#  path: /gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/wd/input_data/hprc-v2.0-mc-grch38.pgin.vcf.gz
-  path: /gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/wd/input_data/hprc-v2.1-mc-grch38_filtered_ids.vcf.gz
+#  path: /gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/workdirs/wd/input_data/hprc-v2.0-mc-grch38.pgin.vcf.gz
+  path: /gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/workdirs/wd/input_data/hprc-v2.1-mc-grch38_filtered_ids.vcf.gz
 
 # The reference callset  (pangenie)is expected to be in vcf format, and may optionally be gzipped.
 # Valid example input file:
 # https://s3-us-west-2.amazonaws.com/human-pangenomics/pangenomes/scratch/2025_02_28_minigraph_cactus/hprc-v2.0-mc-grch38/hprc-v2.0-mc-grch38.pgbi.vcf.gz
 reference_callset:
   label: hprc21grch38callset
-#  path: /gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/wd/input_data/hprc-v2.0-mc-grch38.pgbi.vcf.gz
-  path: /gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/wd/input_data/hprc-v2.1-mc-grch38_filtered_ids_biallelic.vcf.gz
+#  path: /gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/workdirs/wd/input_data/hprc-v2.0-mc-grch38.pgbi.vcf.gz
+  path: /gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/workdirs/wd/input_data/hprc-v2.1-mc-grch38_filtered_ids_biallelic.vcf.gz
 
 # The loci catalog  (locityper)is expected to be in bed format. Tab separated, with 3 columns: 
 # chrom, start, end, optional name.
@@ -34,14 +34,14 @@ reference_callset:
 # https://zenodo.org/records/11068261
 loci_catalog:
   label: clientlociset
-  path: /gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/wd/input_data/2026-07-20_MODY_gene-list_padded.bed
+  path: /gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/workdirs/wd/input_data/2026-07-20_MODY_gene-list_padded.bed
   
 # The CRAM reference genome (locityper) is expected to be in fasta format, and may optionally be gzipped.
 # Valid example input file:
 # https://42basepairs.com/browse/s3/1000genomes/technical/reference/GRCh38_reference_genome?file=GRCh38_full_analysis_set_plus_decoy_hla.fa
 cram_reference_genome:        # for locityper only
   label: grch38decoyhla 
-  path: /gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/wd/input_data/GRCh38_full_analysis_set_plus_decoy_hla.fa.gz
+  path: /gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/workdirs/wd/input_data/GRCh38_full_analysis_set_plus_decoy_hla.fa.gz
 
 
 # Specify which tools to run in the pipeline. Options are: pangenie, locityper
