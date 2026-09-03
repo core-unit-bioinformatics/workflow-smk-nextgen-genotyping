@@ -1,3 +1,8 @@
+import re
+
+wildcard_constraints:
+    ref_genome = "|".join(re.escape(x) for x in REFERENCE_WILDCARD_LOOKUP[ReferenceTypes.GENOME])
+
 
 rule prepare_linear_reference_genome:
     input:
