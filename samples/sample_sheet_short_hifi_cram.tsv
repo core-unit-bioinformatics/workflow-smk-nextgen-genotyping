@@ -1,6 +1,6 @@
 sample	input_path	tech
-HG00733_short_wustl	/gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/workflow-smk-nextgen-genotyping/samples/HG00733_shortwgs_fastq.wustl-PRJNA477862-20XX.fofn	sr
-HG00733_short_nygc	/gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/workflow-smk-nextgen-genotyping/samples/HG00733_shortwgs_fastq.nygc-PRJEB36890-2020.fofn	sr
-HG00733_hifi_hgsvc	/gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/workflow-smk-nextgen-genotyping/samples/HG00733_hifi_fastq.hgsvc-UW-2023.f1f4e3c8.fofn	hifi
-25D136_cram	/gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/wd/input_data/25D136-98.recal.cram	sr
-25D136_fastq	/gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/workflow-smk-nextgen-genotyping/samples/25D136-98_shortwgs_fastq.fofn	sr
+HG00733_short_wustl	/gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/repodirs/workflow-smk-nextgen-genotyping/samples/HG00733_shortwgs_fastq.wustl-PRJNA477862-20XX.fofn	sr
+HG00733_short_nygc	/gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/repodirs/workflow-smk-nextgen-genotyping/samples/HG00733_shortwgs_fastq.nygc-PRJEB36890-2020.fofn	sr
+HG00733_hifi_hgsvc	/gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/repodirs/workflow-smk-nextgen-genotyping/samples/HG00733_hifi_fastq.hgsvc-UW-2023.f1f4e3c8.fofn	hifi
+25D136_cram	/gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/workdirs/wd/input_data/25D136-98.recal.cram	sr
+25D136_fastq	/gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/repodirs/workflow-smk-nextgen-genotyping/samples/25D136-98_shortwgs_fastq.fofn	sr
