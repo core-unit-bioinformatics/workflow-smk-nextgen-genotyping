@@ -46,6 +46,22 @@ if CRAM_SAMPLES_PRESENT:
         raise FileNotFoundError(err_msg)
 
 
+# graph-type routing (see 15-init/06_graph_type.smk)
+#  - graph_type=vcf: {ref_graph} is the configured pangenome graph label
+#  - graph_type=agc: {ref_graph} is a merged "<assemblies>AGC<aliases>"
+#    label from the two assemblies and aliases config entries.
+
+if LOCITYPER_GRAPH_TYPE == "agc":
+    AGC_COMBINED_LABEL_LOOKUP = {
+        f"{assemblies_label}AGC{aliases_label}": (assemblies_label, aliases_label)
+        for assemblies_label in REFERENCE_WILDCARD_LOOKUP[ReferenceTypes.HPRC_ASSEMBLIES]
+        for aliases_label in REFERENCE_WILDCARD_LOOKUP[ReferenceTypes.ASSEMBLY_ALIASES]
+    }
+    LOCITYPER_REF_GRAPH_VALUES = list(AGC_COMBINED_LABEL_LOOKUP.keys())
+else:
+    LOCITYPER_REF_GRAPH_VALUES = REFERENCE_WILDCARD_LOOKUP[ReferenceTypes.PANGENOME]
+
+
 # reference/index preparation 
 
 rule index_locityper_reference_genome:
@@ -180,61 +196,167 @@ rule count_locityper_reference_kmers:
             " --output {output.jf_counts} {input.genome_fasta} &> {log}"
 
 
-rule filter_pangenome_graph_overlaps:
-    """Remove overlapping variants from the shared pangenome graph VCF."""
-    input:
-        graph_vcf = rules.prepare_pangenome_reference_graph.output.graph_vcf
-    output:
-        filtered_graph = DIR_PROC.joinpath(
-            "30-genotyping", "20_locityper", "lt_ref", "{ref_graph}.no-overlaps.vcf.gz"
-        ),
-        tbi = DIR_PROC.joinpath(
-            "30-genotyping", "20_locityper", "lt_ref", "{ref_graph}.no-overlaps.vcf.gz.tbi"
-        )
-    log:
-        DIR_LOG.joinpath("30-genotyping", "20_locityper", "lt_ref", "{ref_graph}.vcfbub.log")
-    benchmark:
-        DIR_RSRC.joinpath("30-genotyping", "20_locityper", "lt_ref", "{ref_graph}.vcfbub.rsrc")
-    conda:
-        DIR_ENVS.joinpath("locityper.yaml")
-    threads: CPU_LOW
-    resources:
-        mem_mb=lambda wildcards, attempt: (4 * 1024) * attempt,
-        time_hrs=lambda wildcards, attempt: 4 * attempt
-    shell:
-        "vcfbub -l 0 -i {input.graph_vcf} 2> {log} | bgzip > {output.filtered_graph}"
-            " && "
-        "tabix -p vcf {output.filtered_graph}"
+if LOCITYPER_GRAPH_TYPE == "vcf":
 
-
-rule build_locityper_loci_database:
-    """Create the locityper loci database ('locityper target')."""
-    input:
-        genome_fasta = rules.prepare_linear_reference_genome.output.genome_fasta,
-        genome_index = rules.index_locityper_reference_genome.output.genome_index,
-        filtered_graph = rules.filter_pangenome_graph_overlaps.output.filtered_graph,
-        jf_counts = rules.count_locityper_reference_kmers.output.jf_counts,
-        loci_coordinates = lambda wildcards: REFERENCE_FILE_LOOKUP[ReferenceTypes.LOCI_CATALOG][wildcards.ref_loci]
-    output:
-        loci_db = directory(
-            DIR_PROC.joinpath(
-                "30-genotyping", "20_locityper", "lt_db", "{ref_genome}_{ref_graph}_{ref_loci}.loci_db"
+    rule filter_pangenome_graph_overlaps:
+        """Remove overlapping variants from the shared pangenome graph VCF."""
+        input:
+            graph_vcf = rules.prepare_pangenome_reference_graph.output.graph_vcf
+        output:
+            filtered_graph = DIR_PROC.joinpath(
+                "30-genotyping", "20_locityper", "lt_ref", "{ref_graph}.no-overlaps.vcf.gz"
+            ),
+            tbi = DIR_PROC.joinpath(
+                "30-genotyping", "20_locityper", "lt_ref", "{ref_graph}.no-overlaps.vcf.gz.tbi"
             )
+        log:
+            DIR_LOG.joinpath("30-genotyping", "20_locityper", "lt_ref", "{ref_graph}.vcfbub.log")
+        benchmark:
+            DIR_RSRC.joinpath("30-genotyping", "20_locityper", "lt_ref", "{ref_graph}.vcfbub.rsrc")
+        conda:
+            DIR_ENVS.joinpath("locityper.yaml")
+        threads: CPU_LOW
+        resources:
+            mem_mb=lambda wildcards, attempt: (4 * 1024) * attempt,
+            time_hrs=lambda wildcards, attempt: 4 * attempt
+        shell:
+            "vcfbub -l 0 -i {input.graph_vcf} 2> {log} | bgzip > {output.filtered_graph}"
+                " && "
+            "tabix -p vcf {output.filtered_graph}"
+
+
+    rule build_locityper_loci_database_vcf:
+        """Create the locityper loci database from the pangenome graph
+        VCF ('locityper target -v ...') - used when graph_type=vcf."""
+        input:
+            genome_fasta = rules.prepare_linear_reference_genome.output.genome_fasta,
+            genome_index = rules.index_locityper_reference_genome.output.genome_index,
+            filtered_graph = rules.filter_pangenome_graph_overlaps.output.filtered_graph,
+            jf_counts = rules.count_locityper_reference_kmers.output.jf_counts,
+            loci_coordinates = lambda wildcards: REFERENCE_FILE_LOOKUP[ReferenceTypes.LOCI_CATALOG][wildcards.ref_loci]
+        output:
+            loci_db = directory(
+                DIR_PROC.joinpath(
+                    "30-genotyping", "20_locityper", "lt_db", "{ref_genome}_{ref_graph}_{ref_loci}.loci_db"
+                )
+            )
+        log:
+            DIR_LOG.joinpath("30-genotyping", "20_locityper", "lt_db", "{ref_genome}_{ref_graph}_{ref_loci}.target.log")
+        benchmark:
+            DIR_RSRC.joinpath("30-genotyping", "20_locityper", "lt_db", "{ref_genome}_{ref_graph}_{ref_loci}.target.rsrc")
+        conda:
+            DIR_ENVS.joinpath("locityper.yaml")
+        threads: CPU_LOW
+        resources:
+            mem_mb=lambda wildcards, attempt: (8 * 1024) * attempt,
+            time_hrs=lambda wildcards, attempt: 4 * attempt
+        shell:
+            "locityper target -d {output.loci_db} -v {input.filtered_graph}"
+                " -r {input.genome_fasta} -j {input.jf_counts}"
+                " -L {input.loci_coordinates} &> {log}"
+
+    _loci_database_rule = rules.build_locityper_loci_database_vcf
+
+elif LOCITYPER_GRAPH_TYPE == "agc":
+
+    rule extract_locityper_agc_targets:
+        """
+        Map loci_catalog BED coordinates against the reference genome
+        and a set of HPRC assemblies (packed in an AGC archive), producing 
+        an enriched targets.bed with a per-locus combined haplotype-panel 
+        FASTA - used in place of a pangenome graph VCF when graph_type=agc.
+        """
+        input:
+            hprc_assemblies = lambda wildcards: REFERENCE_FILE_LOOKUP[ReferenceTypes.HPRC_ASSEMBLIES][
+                AGC_COMBINED_LABEL_LOOKUP[wildcards.ref_graph][0]
+            ],
+            assembly_aliases = lambda wildcards: REFERENCE_FILE_LOOKUP[ReferenceTypes.ASSEMBLY_ALIASES][
+                AGC_COMBINED_LABEL_LOOKUP[wildcards.ref_graph][1]
+            ],
+            ref_fasta = rules.prepare_linear_reference_genome.output.genome_fasta,
+            loci_coordinates = lambda wildcards: REFERENCE_FILE_LOOKUP[ReferenceTypes.LOCI_CATALOG][wildcards.ref_loci]
+        output:
+            target_dir = directory(DIR_PROC.joinpath(
+                "30-genotyping", "20_locityper", "lt_agc", "{ref_genome}_{ref_graph}_{ref_loci}.extracted_targets"
+            ))
+        log:
+            DIR_LOG.joinpath("30-genotyping", "20_locityper", "lt_agc", "{ref_genome}_{ref_graph}_{ref_loci}.extract-targets.log")
+        benchmark:
+            DIR_RSRC.joinpath("30-genotyping", "20_locityper", "lt_agc", "{ref_genome}_{ref_graph}_{ref_loci}.extract-targets.rsrc")
+        conda:
+            DIR_ENVS.joinpath("locityper.yaml")
+        threads: CPU_MEDIUM
+        resources:
+            mem_mb=lambda wildcards, attempt: (16 * 1024) * attempt,
+            time_hrs=lambda wildcards, attempt: 4 * attempt
+        params:
+            script = get_script("extract-targets.sh")
+        shell:
+            "bash {params.script} -i {input.ref_fasta} -i {input.hprc_assemblies}"
+                " -n {input.assembly_aliases} -c {input.loci_coordinates} -r {input.ref_fasta}"
+                " -o {output.target_dir} --threads {threads} &> {log}"
+
+
+    rule build_locityper_loci_database_agc:
+        """Create the locityper loci database from AGC-derived haplotype
+        panels - used when graph_type=agc."""
+        input:
+            genome_fasta = rules.prepare_linear_reference_genome.output.genome_fasta,
+            genome_index = rules.index_locityper_reference_genome.output.genome_index,
+            jf_counts = rules.count_locityper_reference_kmers.output.jf_counts,
+            extracted_targets = rules.extract_locityper_agc_targets.output.target_dir
+        output:
+            loci_db = directory(
+                DIR_PROC.joinpath(
+                    "30-genotyping", "20_locityper", "lt_db", "{ref_genome}_{ref_graph}_{ref_loci}.loci_db"
+                )
+            )
+        log:
+            DIR_LOG.joinpath("30-genotyping", "20_locityper", "lt_db", "{ref_genome}_{ref_graph}_{ref_loci}.target.log")
+        benchmark:
+            DIR_RSRC.joinpath("30-genotyping", "20_locityper", "lt_db", "{ref_genome}_{ref_graph}_{ref_loci}.target.rsrc")
+        conda:
+            DIR_ENVS.joinpath("locityper.yaml")
+        threads: CPU_LOW
+        resources:
+            mem_mb=lambda wildcards, attempt: (8 * 1024) * attempt,
+            time_hrs=lambda wildcards, attempt: 4 * attempt
+        params:
+            targets_bed = lambda wildcards, input: pathlib.Path(input.extracted_targets).joinpath("targets.bed")
+        shell:
+            "locityper target -d {output.loci_db}"
+                " -r {input.genome_fasta} -j {input.jf_counts}"
+                " -L {params.targets_bed} &> {log}"
+
+    _loci_database_rule = rules.build_locityper_loci_database_agc
+
+
+rule augment_locityper_loci_database:
+    """Augment the loci database with pairwise haplotype alignments and
+    basis-haplotype selection (see 'locityper augment --help').
+    Mandatory before genotyping, matching the author's own current
+    reference pipeline. Writes additional files directly into the
+    existing loci_db directory rather than replacing it.
+    """
+    input:
+        loci_db = _loci_database_rule.output.loci_db
+    output:
+        completed = DIR_PROC.joinpath(
+            "30-genotyping", "20_locityper", "lt_db", "{ref_genome}_{ref_graph}_{ref_loci}.augmented.done"
         )
     log:
-        DIR_LOG.joinpath("30-genotyping", "20_locityper", "lt_db", "{ref_genome}_{ref_graph}_{ref_loci}.target.log")
+        DIR_LOG.joinpath("30-genotyping", "20_locityper", "lt_db", "{ref_genome}_{ref_graph}_{ref_loci}.augment.log")
     benchmark:
-        DIR_RSRC.joinpath("30-genotyping", "20_locityper", "lt_db", "{ref_genome}_{ref_graph}_{ref_loci}.target.rsrc")
+        DIR_RSRC.joinpath("30-genotyping", "20_locityper", "lt_db", "{ref_genome}_{ref_graph}_{ref_loci}.augment.rsrc")
     conda:
         DIR_ENVS.joinpath("locityper.yaml")
-    threads: CPU_LOW
+    threads: CPU_MEDIUM
     resources:
-        mem_mb=lambda wildcards, attempt: (8 * 1024) * attempt,
+        mem_mb=lambda wildcards, attempt: (16 * 1024) * attempt,
         time_hrs=lambda wildcards, attempt: 4 * attempt
     shell:
-        "locityper target -d {output.loci_db} -v {input.filtered_graph}"
-            " -r {input.genome_fasta} -j {input.jf_counts}"
-            " -L {input.loci_coordinates} &> {log}"
+        "locityper augment -d {input.loci_db} --threads {threads} &> {log}"
+            " && touch {output.completed}"
 
 
 rule concatenate_locityper_multi_reads:
@@ -382,7 +504,8 @@ rule run_locityper_genotyping:
             if classify_sample_input_type(wildcards.sample, SAMPLE_INPUT_FILES[wildcards.sample]) == "cram"
             else []
         ),
-        loci_database = rules.build_locityper_loci_database.output.loci_db,
+        loci_database = _loci_database_rule.output.loci_db,
+        loci_database_augmented = rules.augment_locityper_loci_database.output.completed,
         preproc_dir = rules.preprocess_locityper_reads.output.preproc_dir
     output:
         genotype_dir = directory(
@@ -474,6 +597,6 @@ rule run_all_locityper_genotyping:
         csv = expand(
             rules.merge_locityper_genotypes_to_csv.output.csv,
             ref_genome=REFERENCE_WILDCARD_LOOKUP[ReferenceTypes.GENOME],
-            ref_graph=REFERENCE_WILDCARD_LOOKUP[ReferenceTypes.PANGENOME],
+            ref_graph=LOCITYPER_REF_GRAPH_VALUES,
             ref_loci=REFERENCE_WILDCARD_LOOKUP[ReferenceTypes.LOCI_CATALOG]
         )

@@ -6,6 +6,7 @@ to "commons/00_commons.smk"
 """
 
 include: "15-init/05_tools.smk"
+include: "15-init/06_graph_type.smk"
 include: "15-init/10_references.smk"
 include: "15-init/20_sample_sheet.smk"
 

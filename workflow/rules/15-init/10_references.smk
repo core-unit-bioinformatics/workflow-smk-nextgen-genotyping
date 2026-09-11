@@ -11,23 +11,40 @@ class ReferenceTypes(enum.Enum):
     REFERENCE_CALLSET = 2
     CALLSET = 2
     LOCI_CATALOG = 3
+    HPRC_ASSEMBLIES = 4
+    ASSEMBLY_ALIASES = 5
 
 
 REFERENCE_WILDCARD_LOOKUP = collections.defaultdict(list)
 REFERENCE_FILE_LOOKUP = collections.defaultdict(dict)
 
-# reference types that are only required if a certain tool has been
-# selected via the 'tools' config parameter (see 15-init/05_tools.smk).
-# Skip validation (and the requirement to have the config key
-# present) if that tool is not part of this run.
-_TOOL_SPECIFIC_REFERENCE_TYPES = {
-    ReferenceTypes.REFERENCE_CALLSET: "pangenie",
-    ReferenceTypes.LOCI_CATALOG: "locityper",
+
+def _pangenome_graph_required():
+    # needed by pangenie always, and by locityper only when building
+    # its loci database from the graph VCF route (not the AGC route) -
+    return "pangenie" in TOOLS_LIST or ("locityper" in TOOLS_LIST and LOCITYPER_GRAPH_TYPE == "vcf")
+
+
+def _agc_assemblies_required():
+    return "locityper" in TOOLS_LIST and LOCITYPER_GRAPH_TYPE == "agc"
+
+
+# reference types that are only required under certain conditions
+# (which tool(s) are selected via 'tools', and for locityper, which
+# loci-database route is selected via 'graph_type'). Skip validation
+# (and the requirement to have the config key present) if the
+# corresponding predicate returns False.
+_REFERENCE_TYPE_REQUIRED_PREDICATES = {
+    ReferenceTypes.PANGENOME_REFERENCE_GRAPH: _pangenome_graph_required,
+    ReferenceTypes.REFERENCE_CALLSET: lambda: "pangenie" in TOOLS_LIST,
+    ReferenceTypes.LOCI_CATALOG: lambda: "locityper" in TOOLS_LIST,
+    ReferenceTypes.HPRC_ASSEMBLIES: _agc_assemblies_required,
+    ReferenceTypes.ASSEMBLY_ALIASES: _agc_assemblies_required,
 }
 
 for member in ReferenceTypes:
-    required_for_tool = _TOOL_SPECIFIC_REFERENCE_TYPES.get(member)
-    if required_for_tool is not None and required_for_tool not in TOOLS_LIST:
+    is_required = _REFERENCE_TYPE_REQUIRED_PREDICATES.get(member)
+    if is_required is not None and not is_required():
         continue
 
     config_key = member.name.lower()
