@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+__developer__ = "Timofey_Prodanov"
+__maintainer__ = "CUBI"
+__source__ = "https://github.com/julie-tooi/genotyping_pipelines/tree/main"
+
 import sys
 import gzip
 from collections import defaultdict
