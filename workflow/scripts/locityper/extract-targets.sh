@@ -231,7 +231,7 @@ function process_assembly {
     fi
 
     msg "    Extracting target subsequences"
-    "$SCRIPT_DIR/inner/merge_hits.py" "$paf_filename" \
+    "$SCRIPT_DIR/merge_hits.py" "$paf_filename" \
         -b "$targets_bed" -g "$short_name" \
         -d "$distance" -l "$min_len" -s "$min_simil" \
         -o "${prefix}.bed.gz" -c "${prefix}.copy_num.csv.gz" \
