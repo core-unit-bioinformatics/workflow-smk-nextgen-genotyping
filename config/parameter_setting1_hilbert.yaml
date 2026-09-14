@@ -45,7 +45,7 @@ cram_reference_genome:        # for locityper only
 # HPRC assemblies packed in an AGC archive (locityper) 
 # Only required when graph_type=agc. Replaces the pangenome reference graph for locityper then (the graph is still needed for pangenie). 
 # Valid example input file: 
-# https://s3-us-west-2.amazonaws.com/human-pangenomics/submissions/B4174A5F-F20E-4DCF-8470-F8A907B640BC--HPRCv2_0.6.1_pr_agc_submission/HPRC_r2_assemblies_0.6.1.agc
+# https://s3-us-west-2.amazonaws.com/human-pangenomics/index.html?prefix=submissions/B4174A5F-F20E-4DCF-8470-F8A907B640BC--HPRCv2_0.6.1_pr_agc_submission/
 hprc_assemblies:
   label: hprc061assemblies
   path: /gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/workdirs/wd/input_data/HPRC_r2_assemblies_0.6.1.agc
@@ -53,7 +53,7 @@ hprc_assemblies:
 # Genome/assembly name aliases for the above HPRC assemblies (locityper), mapping each assembly's raw internal name to a short haplotype name
 # Only required when graph_type=agc.
 # Valid example input file:
-# https://locityper.vercel.app/data/HPRC_r2_assemblies_0.6.1.aliases
+# https://locityper.vercel.app/data/HPRC_r2_assemblies_0.6.1.aliases (https://locityper.vercel.app/target)
 assembly_aliases:
   label: hprc061aliases
   path: /gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/workdirs/wd/input_data/HPRC_r2_assemblies_0.6.1.aliases
