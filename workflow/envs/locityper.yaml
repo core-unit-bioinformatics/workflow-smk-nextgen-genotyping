@@ -7,3 +7,4 @@ dependencies:
   - jellyfish
   - vcfbub
   - htslib
+  - agc
