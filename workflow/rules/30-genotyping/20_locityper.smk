@@ -290,7 +290,7 @@ elif LOCITYPER_GRAPH_TYPE == "agc":
             mem_mb=lambda wildcards, attempt: (16 * 1024) * attempt,
             time_hrs=lambda wildcards, attempt: 4 * attempt
         params:
-            script = get_script("extract-targets.sh")
+            script = get_script("extract-targets.sh", extension="sh")
         shell:
             "bash {params.script} -i {input.ref_fasta} -i {input.hprc_assemblies}"
                 " -n {input.assembly_aliases} -c {input.loci_coordinates} -r {input.ref_fasta}"
