@@ -3,7 +3,7 @@ import re
 
 
 def select_prepare_sample_input_reads_command(sample, input_read_files, output_read_file, nthreads):
-    """"""
+    """Prepare a sample's input reads for PanGenie, based on whether the input is compressed or not."""
 
     if SAMPLE_COMPRESSED_INPUT[sample]:
         cmd = f"pigz -p {nthreads} -d -c {input_read_files} | seqtk seq -A > {output_read_file}"
@@ -13,7 +13,7 @@ def select_prepare_sample_input_reads_command(sample, input_read_files, output_r
 
 
 def select_prepare_gzipped_reference_command(input_reference, output_reference, nthreads):
-    """"""
+    """Prepare a gzipped reference file for PanGenie."""
 
     if isinstance(input_reference, str):
         pass
