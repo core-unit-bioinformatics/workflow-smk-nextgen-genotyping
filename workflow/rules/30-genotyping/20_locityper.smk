@@ -368,6 +368,7 @@ rule concatenate_locityper_multi_reads:
         combined = temp(DIR_PROC.joinpath(
             "30-genotyping", "20_locityper", "lt_cat", "{sample}.combined-tmp.fastq.gz"
         ))
+    priority: -1
     log:
         DIR_LOG.joinpath("30-genotyping", "20_locityper", "lt_cat", "{sample}.cat.log")
     benchmark:
@@ -399,6 +400,7 @@ rule concatenate_locityper_paired_multi_reads:
         combined_r2 = temp(DIR_PROC.joinpath(
             "30-genotyping", "20_locityper", "lt_cat", "{sample}.R2.combined-tmp.fastq.gz"
         ))
+    priority: -1
     log:
         DIR_LOG.joinpath("30-genotyping", "20_locityper", "lt_cat", "{sample}.cat-pe.log")
     benchmark:
@@ -456,6 +458,7 @@ rule preprocess_locityper_reads:
         preproc_dir = directory(
             DIR_PROC.joinpath("30-genotyping", "20_locityper", "lt_pre", "{sample}.{ref_genome}")
         )
+    priority: 1
     log:
         DIR_LOG.joinpath("30-genotyping", "20_locityper", "lt_pre", "{sample}.{ref_genome}.preproc.log")
     benchmark:
@@ -511,6 +514,7 @@ rule run_locityper_genotyping:
         genotype_dir = directory(
             DIR_PROC.joinpath("30-genotyping", "20_locityper", "lt_gt", "{sample}.{ref_genome}_{ref_graph}_{ref_loci}")
         )
+    priority: 1
     log:
         DIR_LOG.joinpath(
             "30-genotyping", "20_locityper", "lt_gt",

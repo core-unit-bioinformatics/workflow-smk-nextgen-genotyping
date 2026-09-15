@@ -51,6 +51,7 @@ rule run_pangenie_genotyping:
         vcf = temp(
             DIR_PROC.joinpath("30-genotyping", "10_pangenie", "pg_gt", "{sample}.{ref_genome}_{ref_graph}_genotyping.vcf")
         )
+    priority: 1
     log:
         DIR_LOG.joinpath("30-genotyping", "10_pangenie", "pg_gt", "{sample}.{ref_genome}_{ref_graph}.pg-run.log")
     benchmark:
@@ -75,6 +76,7 @@ rule convert_pangenie_genotypes_to_biallelic:
     output:
         vcf = DIR_RES.joinpath("genotypes", "by-sample", "pangenie", "{sample}.{ref_genome}_{ref_graph}_{ref_callset}.pg-gt-bi.vcf.gz"),
         tbi = DIR_RES.joinpath("genotypes", "by-sample", "pangenie", "{sample}.{ref_genome}_{ref_graph}_{ref_callset}.pg-gt-bi.vcf.gz.tbi")
+    priority: 1
     benchmark:
         DIR_RSRC.joinpath("30-genotyping", "10_pangenie", "pg_conv", "{sample}.{ref_genome}_{ref_graph}_{ref_callset}.pg-conv.rsrc")
     conda:

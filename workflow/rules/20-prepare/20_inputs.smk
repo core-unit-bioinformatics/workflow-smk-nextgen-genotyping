@@ -1,11 +1,11 @@
 
 rule prepare_sample_input_reads:
-    """PanGenie can only process uncompressed read files.
-    """
+    """PanGenie can only process uncompressed read files."""
     input:
         reads = lambda wildcards: SAMPLE_INPUT_FILES[wildcards.sample]
     output:
         reads = temp(DIR_PROC.joinpath("20-prepare", "20_inputs", "{sample}_reads.fasta"))
+    priority: -1
     benchmark:
         DIR_RSRC.joinpath("20-prepare", "20_inputs", "{sample}_prep-reads.rsrc")
     conda:
