@@ -41,10 +41,33 @@ cram_reference_genome:        # for locityper only
   label: MOCKcram
   path: mock_cram_reference_genome.fasta
 
+# HPRC assemblies packed in an AGC archive (locityper) 
+# Only required when graph_type=agc. Replaces the pangenome reference graph for locityper then (the graph is still needed for pangenie). 
+# Valid example input file: 
+# https://s3-us-west-2.amazonaws.com/human-pangenomics/index.html?prefix=submissions/B4174A5F-F20E-4DCF-8470-F8A907B640BC--HPRCv2_0.6.1_pr_agc_submission/
+hprc_assemblies:
+  label: MOCKassemblies
+  path: mock_HPRC_r2_assemblies_0.6.1.agc
+
+# Genome/assembly name aliases for the above HPRC assemblies (locityper), mapping each assembly's raw internal name to a short haplotype name
+# Only required when graph_type=agc.
+# Valid example input file:
+# https://locityper.vercel.app/data/HPRC_r2_assemblies_0.6.1.aliases (https://locityper.vercel.app/target)
+assembly_aliases:
+  label: MOCKaliases
+  path: mock_HPRC_r2_assemblies_0.6.1.aliases
 
 # Specify which tools to run in the pipeline. Options are: pangenie, locityper
 # This can also be set via --config tools=... on the CLI instead
 tools: "pangenie,locityper"
+
+# For locityper only: which route to use for building its loci
+# database. Options are: 
+# 1. vcf (default - uses pangenome_reference_graph).
+# 2. agc (uses hprc_assemblies + assembly_aliases instead, no pangenome
+# graph needed unless pangenie is also selected).
+# This can also be set via --config graph_type=... on the CLI instead
+graph_type: "vcf"
 
 
 # Config options to use reference container
