@@ -9,8 +9,13 @@ for sample in sorted(set(SAMPLES) - set(SAMPLES_PANGENIE)):
         "does not support (requires FASTA/FASTQ reads). Skipped for pangenie."
     )
 
+SAMPLES_PANGENIE = filter_corrupted_samples(SAMPLES_PANGENIE, "pangenie")
+
 if not SAMPLES_PANGENIE:
-    err_msg = "Error: no samples are compatible with pangenie genotyping (all provide CRAM-only input)."
+    err_msg = (
+        "Error: no samples are compatible with pangenie genotyping "
+        "(all provide CRAM-only input, or failed input validation)."
+    )
     logerr(err_msg)
     raise ValueError(err_msg)
 
@@ -45,7 +50,7 @@ rule index_pangenie_genome_and_graph:
 
 rule run_pangenie_genotyping:
     input:
-        reads =  rules.prepare_sample_input_reads.output.reads,
+        reads = lambda wildcards: SAMPLE_INPUT_FILES[wildcards.sample],
         idx_dir = rules.index_pangenie_genome_and_graph.output.idx_dir
     output:
         vcf = temp(
@@ -64,9 +69,10 @@ rule run_pangenie_genotyping:
         time_hrs=lambda wildcards, attempt: 4 * attempt
     params:
         out_prefix = lambda wildcards, output: str(output.vcf).rsplit("_",1)[0],
-        idx_prefix = lambda wildcards, input: pathlib.Path(input.idx_dir).joinpath(f"{wildcards.ref_genome}_{wildcards.ref_graph}")
+        idx_prefix = lambda wildcards, input: pathlib.Path(input.idx_dir).joinpath(f"{wildcards.ref_genome}_{wildcards.ref_graph}"),
+        reads_arg = lambda wildcards, input: build_pangenie_reads_argument(wildcards.sample, input.reads)
     shell:
-        "PanGenie -f {params.idx_prefix} -i {input.reads} -o {params.out_prefix} -t {threads} -j {threads} -s {wildcards.sample} &> {log}"
+        "PanGenie -f {params.idx_prefix} {params.reads_arg} -o {params.out_prefix} -t {threads} -j {threads} -s {wildcards.sample} &> {log}"
 
 
 rule convert_pangenie_genotypes_to_biallelic:

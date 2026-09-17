@@ -1,15 +1,44 @@
 
 import re
+import gzip
 
 
-def select_prepare_sample_input_reads_command(sample, input_read_files, output_read_file, nthreads):
-    """Prepare a sample's input reads for PanGenie, based on whether the input is compressed or not."""
+def input_sanity_check(file_path):
+    """
+    Basic sanity-check (NOT a full integrity check) that file_path
+    is readable and starts with a plausible FASTA ('>') or FASTQ ('@').
+    """
+    file_path = str(file_path)
+    try:
+        opener = gzip.open if file_path.lower().endswith(".gz") else open
+        with opener(file_path, "rt") as f:
+            first_char = f.read(1)
+    except Exception:
+        # deliberately broad: any failure to read means "not valid" -
+        # this is a best-effort sniff check, not meant to ever crash
+        # the surrounding workflow parse
+        return False
+    return first_char in (">", "@")
 
-    if SAMPLE_COMPRESSED_INPUT[sample]:
-        cmd = f"pigz -p {nthreads} -d -c {input_read_files} | seqtk seq -A > {output_read_file}"
-    else:
-        cmd = f"cat {input_read_files} | seqtk seq -A > {output_read_file}"
-    return cmd
+
+def filter_corrupted_samples(samples, tool_name):
+    """
+    Given a list of tool-eligible sample names, exclude any whose
+    input files fail input_sanity_check, logging a standard warning
+    for each.
+    """
+    valid_samples = []
+    for sample in samples:
+        sample_files = SAMPLE_INPUT_FILES[sample]
+        if all(is_cram_file(f) or input_sanity_check(f) for f in sample_files):
+            valid_samples.append(sample)
+        else:
+            logout(
+                f"WARNING: Input data of sample '{sample}' potentially corrupted "
+                "(failed a basic FASTA/FASTQ readability check). Processing "
+                f"with {tool_name} skipped."
+            )
+    return valid_samples
 
 
 def select_prepare_gzipped_reference_command(input_reference, output_reference, nthreads):
@@ -146,6 +175,13 @@ def classify_sample_input_type(sample, sample_files):
         "by filename; skipped"
     )
     return None
+
+
+def build_pangenie_reads_argument(sample, input_read_files):
+    """Build the '-i' argument for PanGenie, streaming reads directly."""
+    files = " ".join(str(f) for f in input_read_files)
+    cat_cmd = "zcat" if SAMPLE_COMPRESSED_INPUT[sample] else "cat"
+    return f"-i <({cat_cmd} {files})"
 
 
 def build_locityper_reads_argument(sample, reads_input):
