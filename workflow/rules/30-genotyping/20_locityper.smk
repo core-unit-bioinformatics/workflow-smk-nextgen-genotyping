@@ -3,7 +3,7 @@ import pathlib
 
 # Prevents ambiguous wildcard matching between concatenate_locityper_multi_reads
 # ("{sample}.combined-tmp.fastq.gz") and concatenate_locityper_paired_multi_reads
-# ("{sample}.R1/R2.combined-tmp.fastq.gz") -
+# ("{sample}.R1/R2.combined-tmp.fastq.gz")
 wildcard_constraints:
     sample = r"[^./]+"
 
@@ -13,6 +13,7 @@ SAMPLES_LOCITYPER = [
     if classify_sample_input_type(sample, SAMPLE_INPUT_FILES[sample]) is not None
 ]
 
+SAMPLES_LOCITYPER = filter_corrupted_samples(SAMPLES_LOCITYPER, "locityper")
 
 if not SAMPLES_LOCITYPER:
     err_msg = (
@@ -34,7 +35,7 @@ if CRAM_SAMPLES_PRESENT:
             "Error: at least one sample provides CRAM input, but no "
             "'cram_reference_genome' is configured. CRAM decoding requires "
             "the exact reference used to produce the CRAM (see its header), "
-            "Please add a'cram_reference_genome: {label, path}' to the config."
+            "Please add a 'cram_reference_genome: {label, path}' to the config."
         )
         logerr(err_msg)
         raise ValueError(err_msg)
@@ -88,29 +89,29 @@ rule index_locityper_reference_genome:
 if CRAM_SAMPLES_PRESENT:
 
     rule prepare_locityper_cram_reference_genome:
-            """Stage/decompress the CRAM-specific reference genome. This must
-            exactly match what's specified in the CRAM header - see the CRAM
-            format spec - and may differ from 'linear_reference_genome'."""
-            input:
-                raw_reference = CRAM_REFERENCE_GENOME_PATH
-            output:
-                genome_fasta = DIR_LOCAL_REF.joinpath("cram_reference.fasta")
-            log:
-                DIR_LOG.joinpath("30-genotyping", "20_locityper", "lt_cram", "cram_reference.prep.log")
-            benchmark:
-                DIR_RSRC.joinpath("30-genotyping", "20_locityper", "lt_cram", "cram_reference.prep.rsrc")
-            conda:
-                DIR_ENVS.joinpath("file_prep.yaml")
-            threads: CPU_LOW
-            resources:
-                mem_mb=lambda wildcards, attempt: 2048 * attempt,
-                time_hrs=lambda wildcards, attempt: 2 * attempt
-            params:
-                cmd = lambda wildcards, threads, input, output: select_prepare_gzipped_reference_command(
-                    input.raw_reference, output.genome_fasta, threads
-                )
-            shell:
-                "{params.cmd} 2> {log}"
+        """Stage/decompress the CRAM-specific reference genome. This must
+        exactly match what's specified in the CRAM header - see the CRAM
+        format spec - and may differ from 'linear_reference_genome'."""
+        input:
+            raw_reference = CRAM_REFERENCE_GENOME_PATH
+        output:
+            genome_fasta = DIR_LOCAL_REF.joinpath("cram_reference.fasta")
+        log:
+            DIR_LOG.joinpath("30-genotyping", "20_locityper", "lt_cram", "cram_reference.prep.log")
+        benchmark:
+            DIR_RSRC.joinpath("30-genotyping", "20_locityper", "lt_cram", "cram_reference.prep.rsrc")
+        conda:
+            DIR_ENVS.joinpath("file_prep.yaml")
+        threads: CPU_LOW
+        resources:
+            mem_mb=lambda wildcards, attempt: 2048 * attempt,
+            time_hrs=lambda wildcards, attempt: 2 * attempt
+        params:
+            cmd = lambda wildcards, threads, input, output: select_prepare_gzipped_reference_command(
+                input.raw_reference, output.genome_fasta, threads
+            )
+        shell:
+            "{params.cmd} 2> {log}"
 
 
     rule index_locityper_cram_reference_genome:
@@ -332,7 +333,8 @@ elif LOCITYPER_GRAPH_TYPE == "agc":
 
 
 rule augment_locityper_loci_database:
-    """Augment the loci database with pairwise haplotype alignments and
+    """
+    Augment the loci database with pairwise haplotype alignments and
     basis-haplotype selection (see 'locityper augment --help').
     Mandatory before genotyping, matching the author's own current
     reference pipeline. Writes additional files directly into the
