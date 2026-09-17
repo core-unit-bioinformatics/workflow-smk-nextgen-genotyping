@@ -12,7 +12,6 @@ include: "15-init/20_sample_sheet.smk"
 
 include: "20-prepare/00_pyutils.smk"
 include: "20-prepare/10_references.smk"
-include: "20-prepare/20_inputs.smk"
 
 if RUN_PANGENIE:
     include: "30-genotyping/10_pangenie.smk"
