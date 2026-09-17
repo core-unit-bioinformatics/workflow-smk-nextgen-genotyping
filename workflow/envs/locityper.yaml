@@ -8,3 +8,4 @@ dependencies:
   - vcfbub
   - htslib
   - agc
+  - seqtk
