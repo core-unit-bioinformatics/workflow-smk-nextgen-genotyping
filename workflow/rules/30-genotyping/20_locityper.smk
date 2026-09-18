@@ -289,7 +289,7 @@ elif LOCITYPER_GRAPH_TYPE == "agc":
         threads: CPU_MEDIUM
         resources:
             mem_mb=lambda wildcards, attempt: (16 * 1024) * attempt,
-            time_hrs=lambda wildcards, attempt: 4 * attempt
+            time_hrs=lambda wildcards, attempt: 8 * attempt
         params:
             script = get_script("extract-targets.sh", extension="sh")
         shell:
