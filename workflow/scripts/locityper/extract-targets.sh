@@ -2,6 +2,7 @@
 
 # __developer__ = "Timofey_Prodanov"
 # __maintainer__ = "CUBI"
+# - changed trap code in lines 176, 209, 311, 394 (former code swallowed error message on crash) 
 # __source__ = "https://github.com/julie-tooi/genotyping_pipelines/tree/main"
 
 set -Eeuo pipefail
@@ -172,7 +173,7 @@ function prepare_targets {
             [[ $? -eq 0 ]] || panic "Lock file ${targets_lock} exists for too long, perhaps relevant process was killed"
             [[ ! -f "${targets_fa}" ]] || return 0
         else
-            trap 'rm -f "${targets_lock}"; exit 1' INT TERM ERR EXIT
+            trap 'ec=$?; trap - INT TERM ERR EXIT; echo "ERROR: command \"${BASH_COMMAND}\" failed at line ${LINENO} with exit status ${ec}" >&2; rm -f "${targets_lock}"; exit ${ec}' INT TERM ERR EXIT
             cat "${targets_bed}" | while read chrom start end name extra; do
                 samtools faidx "${reference}" "${chrom}:$((start+1))-${end}" | \
                     seqtk seq -U -l 120 | \
@@ -205,7 +206,7 @@ function process_assembly {
     local todo_file="${prefix}.todo"
     [[ ! -f "$ok_file" ]] || return 0
     ( set -C; 2>/dev/null > "$lock_file" ) || return 0
-    trap 'rm -f "${lock_file}"; exit 1' INT TERM ERR EXIT
+    trap 'ec=$?; trap - INT TERM ERR EXIT; echo "ERROR: command \"${BASH_COMMAND}\" failed at line ${LINENO} with exit status ${ec}" >&2; rm -f "${lock_file}"; exit ${ec}' INT TERM ERR EXIT
     touch "${todo_file}"
 
     # ===== START ======
@@ -307,7 +308,7 @@ function combine_locus {
         fi
     fi
     ( set -C; 2>/dev/null > "$lock_file" ) || return 0
-    trap 'rm -f "${lock_file}"; exit 1' INT TERM ERR EXIT
+    trap 'ec=$?; trap - INT TERM ERR EXIT; echo "ERROR: command \"${BASH_COMMAND}\" failed at line ${LINENO} with exit status ${ec}" >&2; rm -f "${lock_file}"; exit ${ec}' INT TERM ERR EXIT
     touch "${todo_file}"
 
     # ===== START ======
@@ -390,7 +391,7 @@ function combine_panels {
     fi
     local lock_file="${output}/targets.lock"
     ( set -C; 2>/dev/null > "$lock_file" ) || return 0
-    trap 'rm -f "${lock_file}"; exit 1' INT TERM ERR EXIT
+    trap 'ec=$?; trap - INT TERM ERR EXIT; echo "ERROR: command \"${BASH_COMMAND}\" failed at line ${LINENO} with exit status ${ec}" >&2; rm -f "${lock_file}"; exit ${ec}' INT TERM ERR EXIT
 
     summarize_copy_num
     find "$output1" -mindepth 1 -maxdepth 1 -name "*.warnings.csv" | \
