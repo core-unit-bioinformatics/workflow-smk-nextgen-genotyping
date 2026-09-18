@@ -2,7 +2,7 @@
 
 # __developer__ = "Timofey_Prodanov"
 # __maintainer__ = "CUBI"
-# - changed trap code in lines 176, 209, 311, 394 (former code swallowed error message on crash) 
+# - changed trap code in lines 176, 209, 311, 394 (former (potential clean-up-) code swallowed error message on job crash) 
 # __source__ = "https://github.com/julie-tooi/genotyping_pipelines/tree/main"
 
 set -Eeuo pipefail
