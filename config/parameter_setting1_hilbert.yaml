@@ -71,6 +71,23 @@ tools: "pangenie,locityper"
 # This can also be set via --config graph_type=... on the CLI instead
 graph_type: "vcf"
 
+# Maximum total temp disk space (in MB) the workflow may use at once
+# for PanGenie/locityper temp() outputs. Defaults to 700000 (~700GB,
+# covers ~5 concurrent samples) if not set.
+# This can also be set via --config max_temp_disk_mb=... on the CLI instead
+max_temp_disk_mb: 700000
+
+# Per-rule temp disk budgets (in MB), used as the disk_mb resource on
+# PanGenie's and locityper's temp-producing/temp-consuming rules.
+# Defaults (if not set): 40000 (~40GB) for PanGenie's temp VCF,
+# 100000 (~100GB) for locityper's concatenated FASTQ temp files.
+# Size these to your own data - measure actual temp file sizes for a
+# few representative samples and add a safety margin (e.g. ~30% over
+# the largest observed size).
+# These can also be set via --config max_temp_pangenie=... /
+# max_temp_locityper=... on the CLI instead
+max_temp_pangenie_mb: 40000
+max_temp_locityper_mb: 100000
 
 # Config options to use reference container
 # as part of the pipeline
