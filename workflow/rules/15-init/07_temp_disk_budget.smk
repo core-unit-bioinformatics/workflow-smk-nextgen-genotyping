@@ -78,5 +78,8 @@ for _tool_name, _tool_mb in (("pangenie", MAX_TEMP_PANGENIE_MB), ("locityper", M
         )
         logerr(err_msg)
         raise ValueError(err_msg)
+		
+resource_scopes:
+    disk_mb="global"
 
 workflow.global_resources.setdefault("disk_mb", _MAX_TEMP_DISK_MB)
