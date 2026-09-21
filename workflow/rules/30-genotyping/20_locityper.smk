@@ -519,7 +519,7 @@ rule run_locityper_genotyping:
         genotype_dir = directory(
             DIR_PROC.joinpath("30-genotyping", "20_locityper", "lt_gt", "{sample}.{ref_genome}_{ref_graph}_{ref_loci}")
         )
-    priority: 1
+    priority: 2
     log:
         DIR_LOG.joinpath(
             "30-genotyping", "20_locityper", "lt_gt",
@@ -535,7 +535,8 @@ rule run_locityper_genotyping:
     threads: CPU_MEDIUM
     resources:
         mem_mb=lambda wildcards, attempt: (96 * 1024) + ((32 * 1024) * (attempt - 1)),
-        time_hrs=lambda wildcards, attempt: 4 * attempt
+        time_hrs=lambda wildcards, attempt: 4 * attempt,
+        disk_mb=MAX_TEMP_LOCITYPER_MB
     params:
         reads_arg = lambda wildcards, input: build_locityper_reads_argument(wildcards.sample, input.reads),
         ref_flag = lambda wildcards, input: (
