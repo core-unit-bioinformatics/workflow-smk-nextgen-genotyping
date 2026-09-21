@@ -378,7 +378,8 @@ rule concatenate_locityper_multi_reads:
     threads: CPU_LOW
     resources:
         mem_mb=lambda wildcards, attempt: 2048 * attempt,
-        time_hrs=lambda wildcards, attempt: 2 * attempt
+        time_hrs=lambda wildcards, attempt: 2 * attempt,
+        disk_mb=MAX_TEMP_LOCITYPER_MB
     params:
         cmd = lambda wildcards, input, output: (
             f"cat {' '.join(str(f) for f in input.reads)} > {output.combined}"
@@ -410,7 +411,8 @@ rule concatenate_locityper_paired_multi_reads:
     threads: CPU_LOW
     resources:
         mem_mb=lambda wildcards, attempt: 2048 * attempt,
-        time_hrs=lambda wildcards, attempt: 2 * attempt
+        time_hrs=lambda wildcards, attempt: 2 * attempt,
+        disk_mb=MAX_TEMP_LOCITYPER_MB
     params:
         cmd = lambda wildcards, input, output: (
             f"cat {' '.join(str(f) for f in input.mate1_reads)} > {output.combined_r1}"
@@ -470,7 +472,8 @@ rule preprocess_locityper_reads:
     threads: CPU_LOW
     resources:
         mem_mb=lambda wildcards, attempt: (32 * 1024) + ((16 * 1024) * (attempt -1)),
-        time_hrs=lambda wildcards, attempt: 2 * attempt
+        time_hrs=lambda wildcards, attempt: 2 * attempt,
+        disk_mb=MAX_TEMP_LOCITYPER_MB
     params:
         reads_arg = lambda wildcards, input: build_locityper_reads_argument(wildcards.sample, input.reads),
         tech_flag = lambda wildcards: f"-t {SAMPLE_TECH[wildcards.sample]}"

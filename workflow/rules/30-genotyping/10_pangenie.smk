@@ -56,7 +56,7 @@ rule run_pangenie_genotyping:
         vcf = temp(
             DIR_PROC.joinpath("30-genotyping", "10_pangenie", "pg_gt", "{sample}.{ref_genome}_{ref_graph}_genotyping.vcf")
         )
-    priority: 1
+    priority: -1
     log:
         DIR_LOG.joinpath("30-genotyping", "10_pangenie", "pg_gt", "{sample}.{ref_genome}_{ref_graph}.pg-run.log")
     benchmark:
@@ -66,7 +66,8 @@ rule run_pangenie_genotyping:
     threads: CPU_HIGH
     resources:
         mem_mb=lambda wildcards, attempt: (96 * 1024) + ((32 * 1024) * (attempt - 1)),
-        time_hrs=lambda wildcards, attempt: 4 * attempt
+        time_hrs=lambda wildcards, attempt: 4 * attempt,
+        disk_mb=MAX_TEMP_PANGENIE_MB
     params:
         out_prefix = lambda wildcards, output: str(output.vcf).rsplit("_",1)[0],
         idx_prefix = lambda wildcards, input: pathlib.Path(input.idx_dir).joinpath(f"{wildcards.ref_genome}_{wildcards.ref_graph}"),
@@ -89,7 +90,8 @@ rule convert_pangenie_genotypes_to_biallelic:
         DIR_ENVS.joinpath("pangenie.yaml")
     resources:
         mem_mb=lambda wildcards, attempt: (24 * 1024) + ((12 * 1024) * (attempt - 1)),
-        time_hrs=lambda wildcards, attempt: 4 * attempt
+        time_hrs=lambda wildcards, attempt: 4 * attempt,
+        disk_mb=MAX_TEMP_PANGENIE_MB
     params:
         script=get_script("convert-to-biallelic.py")
     shell:
