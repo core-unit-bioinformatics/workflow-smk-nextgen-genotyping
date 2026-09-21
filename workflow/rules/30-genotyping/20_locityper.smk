@@ -288,8 +288,8 @@ elif LOCITYPER_GRAPH_TYPE == "agc":
             DIR_ENVS.joinpath("locityper.yaml")
         threads: CPU_MEDIUM
         resources:
-            mem_mb=lambda wildcards, attempt: (16 * 1024) * attempt,
-            time_hrs=lambda wildcards, attempt: 8 * attempt
+            mem_mb=lambda wildcards, attempt: (20 * 1024) * attempt,
+            time_hrs=lambda wildcards, attempt: 12 * attempt
         params:
             script = get_script("extract-targets.sh", extension="sh")
         shell:
