@@ -115,17 +115,19 @@ rule merge_pangenie_genotypes_to_multisample:
     output:
         vcf = DIR_RES.joinpath("genotypes", "merged", "pangenie", "SAMPLES.{ref_genome}_{ref_graph}_{ref_callset}.pg-gt-bi.vcf.gz"),
         tbi = DIR_RES.joinpath("genotypes", "merged", "pangenie", "SAMPLES.{ref_genome}_{ref_graph}_{ref_callset}.pg-gt-bi.vcf.gz.tbi"),
+    log:
+        DIR_LOG.joinpath("30-genotyping", "10_pangenie", "pg_merge", "SAMPLES.{ref_genome}_{ref_graph}_{ref_callset}.pg-merge.log")
     benchmark:
         DIR_RSRC.joinpath("30-genotyping", "10_pangenie", "pg_merge", "SAMPLES.{ref_genome}_{ref_graph}_{ref_callset}.pg-merge.rsrc")
     conda:
         DIR_ENVS.joinpath("pangenie.yaml")
     resources:
-        mem_mb=lambda wildcards, attempt: (4 * 1024) * attempt,
-        time_hrs=lambda wildcards, attempt: 1 * attempt
+        mem_mb=lambda wildcards, attempt: (32 * 1024) * attempt,
+        time_hrs=lambda wildcards, attempt: 4 * attempt
     params:
         force_single = lambda wildcards, input: "--force-single" if len(input.vcf) == 1 else ""
     shell:
-        "bcftools merge {params.force_single} {input.vcf} -Oz -o {output.vcf}"
+        "bcftools merge {params.force_single} {input.vcf} -Oz -o {output.vcf} &> {log}"
             " && "
         "tabix -p vcf {output.vcf}"
 
