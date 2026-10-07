@@ -121,13 +121,19 @@ rule merge_pangenie_genotypes_to_multisample:
         DIR_RSRC.joinpath("30-genotyping", "10_pangenie", "pg_merge", "SAMPLES.{ref_genome}_{ref_graph}_{ref_callset}.pg-merge.rsrc")
     conda:
         DIR_ENVS.joinpath("pangenie.yaml")
+    threads: 4  # bcftools only uses these for compressing the output stream
     resources:
-        mem_mb=lambda wildcards, attempt: (32 * 1024) * attempt,
-        time_hrs=lambda wildcards, attempt: 4 * attempt
+        # attempt 1: fits the 256GB nodes; attempt 2: fits the 384GB nodes
+        mem_mb=lambda wildcards, attempt: (220 * 1024) + ((130 * 1024) * (attempt - 1)),
+        # attempt 1: 73h - above lower limit of long queue
+        time_hrs=lambda wildcards, attempt: 73 + (35 * (attempt - 1)) 
+        # sufficient for 100 samples:
+        # mem_mb=lambda wildcards, attempt: (32 * 1024) * attempt,
+        # time_hrs=lambda wildcards, attempt: 8 * attempt
     params:
         force_single = lambda wildcards, input: "--force-single" if len(input.vcf) == 1 else ""
     shell:
-        "bcftools merge {params.force_single} {input.vcf} -Oz -o {output.vcf} &> {log}"
+        "bcftools merge {params.force_single} --threads {threads} {input.vcf} -Oz -o {output.vcf} &> {log}"
             " && "
         "tabix -p vcf {output.vcf}"
 
