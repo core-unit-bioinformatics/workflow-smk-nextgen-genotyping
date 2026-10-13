@@ -66,7 +66,7 @@ rule run_pangenie_genotyping:
     threads: CPU_HIGH
     resources:
         mem_mb=lambda wildcards, attempt: (96 * 1024) + ((32 * 1024) * (attempt - 1)),
-        time_hrs=lambda wildcards, attempt: 4 * attempt,
+        time_hrs=lambda wildcards, attempt: 12 * attempt,
         disk_mb=MAX_TEMP_PANGENIE_MB
     params:
         out_prefix = lambda wildcards, output: str(output.vcf).rsplit("_",1)[0],
