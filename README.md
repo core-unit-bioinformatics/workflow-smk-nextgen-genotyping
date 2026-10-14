@@ -17,19 +17,24 @@ For a detailed setup guide, please refer to [the workflow documentation](docs/RE
 **Internal (template) remark**: adapt the above if the workflow deployment has additional requirements (e.g., Apptainer).
 
 ## Required input data
-Programm call and parameters for execution:
+Program call and parameters for execution:
 ```
-snakemake -d ../wd/ --configfile config/parameter_setting1_mhpc.yaml --config samples=/path/to/samples/samplesheet.tsv tools=locityper,pangenie cwd=/path/to/workflow-smk-nextgen-genotyping --profile ../wd/prf_mhpc
+snakemake -d ../wd/ --configfile config/parameter_setting1_mhpc.yaml --config samples=/path/to/samples/samplesheet.tsv cwd=/path/to/workflow-smk-nextgen-genotyping tools=locityper,pangenie graph_type=agc max_temp_disk_mb=20000000 max_temp_pangenie_mb=40000 max_temp_locityper_mb=100000 --profile ../wd/prf_mhpc
 ```
 
-path | meaning
-:--- | :---
-../wd/ | Working directory (as created with the workflows init.py script)
-config/parameter_setting1_mhpc.yaml | Config file containing pathsways for different references (examples specified in said file)
-/path/to/samples/samplesheet.tsv  | Sample sheet containing the columns "sample" , "input_path" (comma separated if >1), and "tech" (sr, hifi or ont)
-locityper,pangenie | Modules that should be used to process the data
-/path/to/workflow-smk-nextgen-genotyping | Path to the workflow directory
-../wd/prf_mhpc | Path to the snakemake profile (as created by snakamake-utils set_profile.py script)
+| Parameter | Description |
+|---|---|
+| `-d ../wd/` | Working directory (as created with the workflows init.py script) |
+| `--configfile config/parameter_setting1_mhpc.yaml` | Config file containing paths for different references (examples specified in said file) |
+| `--config` | Needed parameter before the following ones (only called once, not in front of every one) |
+| &emsp;`/path/to/samples/samplesheet.tsv` | Sample sheet containing the columns "sample", "input_path" (comma separated if >1), and "tech" (sr, hifi or ont) |
+| &emsp;`locityper,pangenie` | Modules that should be used to process the data |
+| &emsp;`agc OR vcf` | Locityper processing pathway, either agc or vcf |
+| &emsp;`max_temp_disk_mb=20000000` | Maximum space allocated for simultaneous temporary files |
+| &emsp;`max_temp_pangenie_mb=40000` | Assumed size of temporary files per sample for the pangenie module |
+| &emsp;`max_temp_locityper_mb=100000` | Assumed size of temporary files per sample for the locityper module |
+| &emsp;`/path/to/workflow-smk-nextgen-genotyping` | Path to the workflow directory |
+| `--profile ../wd/prf_mhpc` | Path to the snakemake profile (as created by snakemake-utils set_profile.py script) |
 
 \
 Add info here - be concise, and provide more details in [the workflow documentation](docs/README.md).
@@ -37,15 +42,15 @@ Add info here - be concise, and provide more details in [the workflow documentat
 ## Produced output data
 
 Next to different intermediate files the following main output files are generated:
-path | meaning
-:--- | :---
-../wd/results/genotypes/by-sample/pangenie | Per-sample data of the pangenie output of all processed samples
-../wd/results/genotypes/merged/pangenie | Merged data of the pangenie output of all processed samples
-../wd/results/genotypes/merged/locityper | Merged data of the locityper output of all processed samples
+
+| Path | Description |
+|---|---|
+| `../wd/results/genotypes/by-sample/pangenie` | Per-sample data of the pangenie output of all processed samples |
+| `../wd/results/genotypes/merged/pangenie` | Merged data of the pangenie output of all processed samples |
+| `../wd/results/genotypes/merged/locityper` | Merged data of the locityper output of all processed samples |
 
 \
 Add info here - be concise, and provide more details in [the workflow documentation](docs/README.md).
-
 # Citation
 
 If not indicated otherwise above, please follow [these instructions](CITATION.md) to cite this repository in your own work.
