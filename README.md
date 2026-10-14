@@ -24,12 +24,12 @@ snakemake -d ../wd/ --configfile config/parameter_setting1_mhpc.yaml --config sa
 
 path | meaning
 :--- | :---
-../wd/ | working directory (as created with the workflows init.py script)
-config/parameter_setting1_mhpc.yaml | config file containing pathsways for different references (examples specified in said file)
-/path/to/samples/samplesheet.tsv  | sample sheet containing the columns "sample" , "input_path" (comma separated if >1), and "tech" (sr, hifi or ont)
-locityper,pangenie | modules that should be used to process the data
-/path/to/workflow-smk-nextgen-genotyping | path to the workflow directory
-../wd/prf_mhpc | path to the snakemake profile (as created by snakamake-utils set_profile.py script)
+../wd/ | Working directory (as created with the workflows init.py script)
+config/parameter_setting1_mhpc.yaml | Config file containing pathsways for different references (examples specified in said file)
+/path/to/samples/samplesheet.tsv  | Sample sheet containing the columns "sample" , "input_path" (comma separated if >1), and "tech" (sr, hifi or ont)
+locityper,pangenie | Modules that should be used to process the data
+/path/to/workflow-smk-nextgen-genotyping | Path to the workflow directory
+../wd/prf_mhpc | Path to the snakemake profile (as created by snakamake-utils set_profile.py script)
 
 \
 Add info here - be concise, and provide more details in [the workflow documentation](docs/README.md).
@@ -39,9 +39,9 @@ Add info here - be concise, and provide more details in [the workflow documentat
 Next to different intermediate files the following main output files are generated:
 path | meaning
 :--- | :---
-../wd/results/genotypes/by-sample/pangenie | per-sample data of the pangenie output of all processed samples
-../wd/results/genotypes/merged/pangenie | merged data of the pangenie output of all processed samples
-../wd/results/genotypes/merged/locityper | merged data of the locityper output of all processed samples
+../wd/results/genotypes/by-sample/pangenie | Per-sample data of the pangenie output of all processed samples
+../wd/results/genotypes/merged/pangenie | Merged data of the pangenie output of all processed samples
+../wd/results/genotypes/merged/locityper | Merged data of the locityper output of all processed samples
 
 \
 Add info here - be concise, and provide more details in [the workflow documentation](docs/README.md).
