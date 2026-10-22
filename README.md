@@ -49,6 +49,12 @@ Next to different intermediate files the following main output files are generat
 | `../wd/results/genotypes/merged/pangenie` | Merged data of the pangenie output of all processed samples |
 | `../wd/results/genotypes/merged/locityper` | Merged data of the locityper output of all processed samples |
 
+## Helper scripts (`workflow/scripts/helper-scripts/`)
+| `annotate_gene_coordinates.py` | Looks up genomic start/end coordinates for gene symbols from a list of annotated variants |
+| `lookup_gene_names.sh` | Looks up genomic start/end coordinates and chromosome for gene symbols given on the command line |
+| `pad_bed.py` | Evenly pads each locus in a bed file to a minimum of 30kb |
+| `vcf_sample_overlap.py` | Compares genotypes across a merged VCF containing 3 samples |
+| `missing_genotypes_per_sample.sh` | Per-sample count and fraction of missing genotypes in a (multi-sample) VCF, e.g. the PanGenie output |
 \
 Add info here - be concise, and provide more details in [the workflow documentation](docs/README.md).
 # Citation
