@@ -58,7 +58,8 @@ Next to different intermediate files the following main output files are generat
 | `pad_bed.py` | Evenly pads each locus in a bed file to a minimum of 30kb |
 | `vcf_sample_overlap.py` | Compares genotypes across a merged VCF containing 3 samples |
 | `missing_genotypes_per_sample.sh` | Per-sample count and fraction of missing genotypes in a (multi-sample) VCF, e.g. the PanGenie output |
-
+| `rare_homozygous_svs.py` | Filter all rare (AF in panel < 1%), homozygous variants from the pangenie output |
+| `samplesheet_file_sizes.py` | Falculate the file size for each sample in the sample sheet |
 ## Configs (`config/`)
 
 | Path | Description |
