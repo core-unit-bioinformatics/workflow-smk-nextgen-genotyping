@@ -1,0 +1,7 @@
+name: plotting
+dependencies:
+  - python=3.*
+  - bcftools=1.23.*
+  - pandas=2.*
+  - numpy=2.*
+  - matplotlib-base=3.*

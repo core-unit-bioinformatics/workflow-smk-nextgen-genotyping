@@ -16,6 +16,9 @@ include: "20-prepare/10_references.smk"
 
 if RUN_PANGENIE:
     include: "30-genotyping/10_pangenie.smk"
+    include: "50-plotting/10_variant_tables.smk"
+    include: "50-plotting/20_diagnostic_plots.smk"
+
 
 if RUN_LOCITYPER:
     include: "30-genotyping/20_locityper.smk"

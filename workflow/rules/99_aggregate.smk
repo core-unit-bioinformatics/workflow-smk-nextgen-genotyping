@@ -15,6 +15,8 @@ WORKFLOW_OUTPUT = []
 
 if RUN_PANGENIE:
     WORKFLOW_OUTPUT.extend(rules.run_all_pangenie_genotyping.input.vcf)
+    WORKFLOW_OUTPUT.extend(rules.run_all_pangenie_diagnostic_plots.input.plots)
 
 if RUN_LOCITYPER:
     WORKFLOW_OUTPUT.extend(rules.run_all_locityper_genotyping.input.csv)
+
