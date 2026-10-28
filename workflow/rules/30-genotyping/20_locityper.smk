@@ -295,7 +295,7 @@ elif LOCITYPER_GRAPH_TYPE == "agc":
         shell:
             "bash {params.script} -i {input.ref_fasta} -i {input.hprc_assemblies}"
                 " -n {input.assembly_aliases} -c {input.loci_coordinates} -r {input.ref_fasta}"
-                " -o {output.target_dir} --threads {threads} &> {log}"
+                " -o {output.target_dir} --threads {threads} -d 100000 &> {log}"
 
 
     rule build_locityper_loci_database_agc:
