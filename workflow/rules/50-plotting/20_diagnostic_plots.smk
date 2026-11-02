@@ -74,7 +74,7 @@ rule plot_pangenie_af_scatter:
         DIR_ENVS.joinpath("plotting.yaml")
     threads: CPU_LOW
     resources:
-        mem_mb=lambda wildcards, attempt: (32 * 1024) * attempt,
+        mem_mb=lambda wildcards, attempt: (16 * 1024) * attempt,
         time_hrs=lambda wildcards, attempt: 2 * attempt
     params:
         script = get_script("plot_af_scatter.py"),
@@ -98,12 +98,14 @@ rule plot_pangenie_svs_per_sample:
         pdf = DIR_RES.joinpath("plots", "SAMPLES.{ref_genome}_{ref_graph}_{ref_callset}.pg-sv-per-sample.pdf")
     log:
         DIR_LOG.joinpath("50-plotting", "20_plots", "SAMPLES.{ref_genome}_{ref_graph}_{ref_callset}.pg-sv-per-sample.log")
+    benchmark:
+        DIR_RSRC.joinpath("50-plotting", "20_plots", "SAMPLES.{ref_genome}_{ref_graph}_{ref_callset}.pg-sv-per-sample.rsrc")
     conda:
         DIR_ENVS.joinpath("plotting.yaml")
     threads: CPU_LOW
     resources:
-        mem_mb=lambda wildcards, attempt: 2048 * attempt,
-        time_hrs=lambda wildcards, attempt: 1 * attempt
+        mem_mb=lambda wildcards, attempt: (4 * 1024) * attempt,
+        time_hrs=lambda wildcards, attempt: 2 * attempt
     params:
         script = get_script("plot_sv_per_sample.py"),
         out_prefix = lambda wildcards, output: str(output.png).removesuffix(".png"),

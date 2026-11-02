@@ -34,7 +34,7 @@ rule tabulate_pangenie_cohort_variants:
     threads: CPU_LOW
     resources:
         mem_mb=lambda wildcards, attempt: (4 * 1024) * attempt,
-        time_hrs=lambda wildcards, attempt: 12 * attempt
+        time_hrs=lambda wildcards, attempt: 2 * attempt
     params:
         script = get_script("variant_table.py"),
         sv_min_length = SV_MIN_LENGTH
@@ -67,7 +67,7 @@ rule tabulate_pangenie_panel_variants:
     threads: CPU_LOW
     resources:
         mem_mb=lambda wildcards, attempt: (4 * 1024) * attempt,
-        time_hrs=lambda wildcards, attempt: 12 * attempt
+        time_hrs=lambda wildcards, attempt: 2 * attempt
     params:
         script = get_script("variant_table.py"),
         sv_min_length = SV_MIN_LENGTH
@@ -99,7 +99,7 @@ rule extract_pangenie_svs:
     threads: CPU_LOW
     resources:
         mem_mb=lambda wildcards, attempt: (4 * 1024) * attempt,
-        time_hrs=lambda wildcards, attempt: 12 * attempt
+        time_hrs=lambda wildcards, attempt: 2 * attempt
     params:
         ilen_filter = f"ILEN<=-{SV_MIN_LENGTH} || ILEN>={SV_MIN_LENGTH}"
     shell:
