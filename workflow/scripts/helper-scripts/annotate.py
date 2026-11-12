@@ -1,0 +1,77 @@
+#!/usr/bin/env python3
+
+import argparse
+import collections
+import sys
+
+import common
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Annotate genotyping results.',
+        formatter_class=argparse.RawTextHelpFormatter)
+    parser.add_argument('-i', '--input', metavar='FILE', required=True,
+        help='Locityper CSV file for multiple loci and samples.')
+    parser.add_argument('-a', '--annotation', metavar='FILE', required=True,
+        help='Tab-separated annotation for locus haplotypes.\n'
+            'Columns: locus, haplotype, annotation, tag. Tag is an optional column,\n'
+            'used if the same locus has multiple annotations.')
+    parser.add_argument('-o', '--output', metavar='FILE', required=True,
+        help='Output CSV file.')
+    parser.add_argument('-t', '--truth', action='store_true',
+        help='Add ground-truth sample annotation to the output file.')
+    args = parser.parse_args()
+
+    explicit_tags = False
+    with common.open(args.annotation) as f:
+        annotation = collections.defaultdict(lambda: collections.defaultdict(dict))
+        for line in f:
+            if line.startswith('#'):
+                continue
+            line = line.strip().split('\t')
+            locus = line[0]
+            hap = line[1]
+            annot = line[2]
+            assert annot != ''
+            tag = line[3] if len(line) >= 4 else '*'
+            if tag == '':
+                tag = '*'
+            explicit_tags |= tag != '*'
+            if hap in annotation[locus][tag]:
+                sys.stderr.write(f'WARN: Haplotype {hap} appears twice for locus {locus}, tag {tag}\n')
+            annotation[locus][tag][hap] = annot
+
+    format_tag = (lambda tag: f'\t{tag}') if explicit_tags else (lambda tag: '')
+
+    with common.open(args.input) as inp, common.open(args.output, 'wt') as out:
+        out.write(f'# {" ".join(sys.argv)}\n')
+        out.write(f'sample\tlocus{format_tag("tag")}\thap1\thap2')
+        if args.truth:
+            out.write('\ttrue1\ttrue2')
+        out.write('\n')
+
+        for row in common.read_csv(inp):
+            locus = row['locus']
+            locus_annot = annotation.get(locus)
+            if not locus_annot:
+                continue
+
+            sample = row['sample']
+            gt = row['genotype']
+            if gt == '*':
+                for tag in locus_annot:
+                    out.write(f'{sample}\t{locus}{format_tag(tag)}\t<NOCALL>\t<NOCALL>\n')
+                continue
+
+            for tag, tag_annot in locus_annot.items():
+                out.write(f'{sample}\t{locus}{format_tag(tag)}')
+                for hap in gt.split(','):
+                    out.write('\t{}'.format(tag_annot.get(hap, '<UNKNOWN>')))
+                if args.truth:
+                    for i in range(1, 3):
+                        out.write('\t{}'.format(tag_annot.get(f'{sample}.{i}', '<UNKNOWN>')))
+                out.write('\n')
+
+
+if __name__ == '__main__':
+    main()
