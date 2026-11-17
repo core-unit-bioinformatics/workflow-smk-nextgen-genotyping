@@ -1,201 +1,136 @@
 # KaryoScope read annotation (3rd tool next to PanGenie and locityper)
 
-Adds [KaryoScope](https://github.com/barthel-lab/KaryoScope) (`karyoscope annotate`) to
-workflow-smk-nextgen-genotyping as an optional third tool (`tools: "pangenie,locityper,karyoscope"`).
-Only `annotate` is integrated for now; `karyoscope karyotype` only accepts assemblies
-(read-level input is rejected) and can be decided on later.
+Adds [KaryoScope](https://github.com/barthel-lab/KaryoScope) `annotate` to
+workflow-smk-nextgen-genotyping as an optional third tool (`tools: "...,karyoscope"`).
+Every k-mer of every read is labelled against a k-mer database built from T2T-CHM13v2.0.
+The per-read labels are then condensed into per-sample and cohort tables. `karyoscope karyotype`
+only accepts assemblies, not reads, and isn't part of this module.
 
-Pinned versions:
+Pinned versions: KaryoScope **2.3.0** (`928be8e`), HKS backend **0.4.0** (`04bbc52`),
+database **`HKS_human_CHM13_v2`** v2.0.0 (Zenodo record 21150216).
 
-- KaryoScope **2.3.0** (commit `928be8e`)
-- HKS backend **0.4.0** (commit `04bbc52`, as pinned by KaryoScope)
-- Database **`HKS_human_CHM13_v2`** v2.0.0 (Zenodo record 21150216, built from T2T-CHM13v2.0)
+## Files
 
-Files (to be created, see the sections below):
+| File in this package | Goes to (in the repo) |
+|---|---|
+| `karyoscope.def` | `workflow/containers/karyoscope.def` (recipe only; the `.sif` is not committed) |
+| `10_karyoscope.smk` | `workflow/rules/40-karyotyping/10_karyoscope.smk` |
+| `karyoscope_db.sh` | `workflow/scripts/karyoscope/karyoscope_db.sh` |
+| `karyoscope_summarize.py` | `workflow/scripts/karyoscope/karyoscope_summarize.py` |
+| `README.md` | `docs/karyoscope/README.md` (this file) |
 
-- `karyoscope.def`: Apptainer recipe, built on a machine with internet, `.sif` copied to the server
-- `workflow/rules/40-karyotyping/10_karyoscope.smk`: the new module
-- `workflow/scripts/karyoscope_db.sh`: database check / download / register
-- additions to `00_modules.smk`, `99_aggregate.smk`, `15-init/05_tools.smk` and the parameter file
+Plus small edits to `15-init/05_tools.smk`, `00_modules.smk`, `99_aggregate.smk` and the
+parameter file (step 3). The PBS profile stays unchanged; the bind path goes on the command
+line (step 5).
 
 ## What the run does
 
-Short-read FASTQ (downsampled once, outside the workflow) → `karyoscope annotate` against
-`HKS_human_CHM13_v2`. Every k-mer of every read is looked up in the database, and
-each feature set gets a BED where column 1 is the read (by rank, not by name), columns 2–3
-are k-mer offsets **within the read** (not genomic positions) and column 4 is the feature
-(e.g. the chromosome of origin, or `novel` if the k-mer isn't in the database).
+```
+FASTQ (downsampled, R1 + R2)
+  └─ prepare_karyoscope_database   once, local rule: check / register / download the DB
+  └─ run_karyoscope_annotate       per sample: one smoothed BED per FASTQ and feature set
+  └─ summarize_karyoscope_sample   per sample: annotated bp per label and feature set
+  └─ merge_karyoscope_cohort       cohort tables
+```
 
-Per-read BEDs are an intermediate, not a result. The planned result is a per-sample summary
-(see [Aggregation](#aggregation-next-step)): how much read sequence each chromosome gets,
-normalised to the autosomes, which gives sex (X/Y dosage) and whole-chromosome aneuploidy
-QC without alignment.
+### Feature sets
 
-Result per sample (raw): `results/proc/40-karyotyping/10_karyoscope/ks_annot/<sample>/`
-with one `<fastq>.HKS_human_CHM13_v2.<set>.smoothed.bed.gz` per input file and feature set.
+`chromosome` and `gene` are always annotated. More sets can be added in the parameter file
+or on the command line (`tools` works the same way):
 
-## Why the HKS backend
+```bash
+snakemake ... --config karyo-features=region,repeat
+```
 
-Both backends use the same `karyoscope annotate` call, so the rules are identical; the
-backend is chosen by the database. HKS wins on the remaining points:
+| Set | Labels |
+|---|---|
+| `chromosome` (default) | `chr1` … `chrY`; group labels (`acrocentric`, `autosome`, `sex`, …) for k-mers shared between chromosomes |
+| `gene` (default) | `exon`, `intron`, `intergenic` |
+| `region` | `p_arm`, `q_arm`, centromeric satellites (`hor`, `hsat2`, `hsat3`, `bsat`, `rDNA`, …) |
+| `repeat` | RepeatMasker class (`LINE`, `SINE`, `LTR`, `Satellite`, …, `nonrepeat`) |
+| `acrocentric`, `subtelomeric` | features of the acrocentric short arms / chromosome ends |
 
-| | HKS (`HKS_human_CHM13_v2`) | KMC (`KS_human_CHM13_v2`) |
-|---|---|---|
-| download / extracted | 13.3 GB / 22.7 GB | 16.3 GB / 17.2 GB |
-| memory to request | ≥ 16 GB | ≥ 96 GB |
-| container build | extra `cargo install` of `hks` | `make` of a bundled C++ helper |
-| future | the backend KaryoScope is moving to | to be retired |
+Every set can also give `novel` (k-mer not in CHM13: errors, private variants,
+contamination) and `none` (chrM).
 
-With ≥ 96 GB per job, KMC would fit only 1–2 jobs per default-pool node.
+### Outputs
 
-## Database handling
+| Path | Content |
+|---|---|
+| `results/karyotyping/karyoscope/SAMPLES.chromosome_dosage.tsv` | main QC table, see below |
+| `results/karyotyping/karyoscope/SAMPLES.<set>.composition.tsv` | per feature set: sample × label, fraction of annotated bp |
+| `<proc>/40-karyotyping/10_karyoscope/ks_sum/<sample>.composition.tsv` | per sample, long format (set, label, bp, fraction) |
+| `<proc>/40-karyotyping/10_karyoscope/ks_annot/<sample>/` | raw per-read BEDs (`<fastq stem>.HKS_human_CHM13_v2.<set>.smoothed.bed.gz`) |
 
-The database lives in `local_ref/karyoscope/` (the `--db-root`). KaryoScope only finds
-databases listed in `local_ref/karyoscope/installed.json`, so an extracted folder alone
-isn't enough; it has to be registered once.
+The raw BEDs are large. With `keep_read_annotations: false` they're `temp()` and get
+deleted once the sample is summarized.
 
-The rule `prepare_karyoscope_database` (a local rule, runs where Snakemake is started)
-calls `karyoscope_db.sh`, which goes through these cases in order:
+**`SAMPLES.chromosome_dosage.tsv`** columns:
 
-1. **Already registered** → nothing to do.
-2. **Extracted folder present but not registered** (copied by hand) → `karyoscope register`.
-3. **Tarball present** (`local_ref/karyoscope/HKS_human_CHM13_v2.tar.gz`, copied by hand)
-   → check SHA-256, extract, register, delete the tarball.
-4. **Nothing present** → `karyoscope download` (needs zenodo.org and raw.githubusercontent.com).
-5. **Download fails** → the job stops with instructions for the manual download.
+| Column | Meaning |
+|---|---|
+| `total_bp`, `autosomal_bp` | annotated k-mer bp in the `chromosome` set (all labels / `chr1`–`chr22`) |
+| `novel_fraction` | share of `novel`; high values point to contamination or poor quality |
+| `chr1` … `chr22` | the chromosome's share of autosomal bp, divided by the cohort median. ~1.0 = normal, ~1.5 = trisomy, ~0.5 = monosomy |
+| `x_to_autosomes` | chrX bp / autosomal bp |
+| `y_ppm` | chrY bp per million autosomal bp |
+| `inferred_sex` | `male` (y_ppm ≥ `male_y_ppm`), `female` (≤ `female_y_ppm`), else `ambiguous` |
+| `x_ratio` | `x_to_autosomes` / median of the same inferred sex. Catches e.g. XXY (~2) or X0 (~0.5) |
+| `flags` | chromosomes deviating from 1 by more than `max_deviation`, plus `sex:ambiguous`; `.` = none |
 
-Then it touches `local_ref/karyoscope/HKS_human_CHM13_v2.ready`, which the annotate rules
-depend on. Disk: ~36 GB free in `local_ref/` during installation (archive + extracted copy),
-~23 GB afterwards.
+All values are fractions, so they don't depend on sequencing depth. The ratios use the
+**cohort median** as the baseline, so they need several samples (warning below 5) and
+assume most samples are normal. The sex thresholds are first guesses; check them on the
+first cohort (step 6).
 
-### Manual download (server without internet, e.g. hilbert)
+## Step 1: container and database (machine with internet)
 
-On any machine with internet:
+The container can't be built on the server: the build pulls the base image from Docker Hub,
+the sources from GitHub, the Rust crates for `hks` from crates.io and a package from PyPI.
+A git or conda mirror doesn't cover that. Build it on your Ubuntu machine with Apptainer:
+
+```bash
+sudo apptainer build karyoscope_2.3.0.sif workflow/containers/karyoscope.def   # or --fakeroot
+apptainer test karyoscope_2.3.0.sif
+```
+
+If the base image tag `26.7.2-1` isn't found, use any current `condaforge/miniforge3` tag.
+
+Download and verify the database (13.3 GB):
 
 ```bash
 curl -L -o HKS_human_CHM13_v2.tar.gz \
     "https://zenodo.org/records/21150216/files/HKS_human_CHM13_v2.tar.gz?download=1"
-echo "4da29c348aaf4bc0808adb036c8557827bee798eb306cb0030f351d0a88b977b  HKS_human_CHM13_v2.tar.gz" | sha256sum -c -
+echo "4da29c348aaf4bc0808adb036c8557827bee798eb306cb0030f351d0a88b977b  HKS_human_CHM13_v2.tar.gz" \
+    | sha256sum -c -
+```
+
+Copy both to the server:
+
+```bash
+rsync -P karyoscope_2.3.0.sif <server>:/path/to/containers/
 rsync -P HKS_human_CHM13_v2.tar.gz <server>:<wd>/local_ref/karyoscope/
 ```
 
-The next workflow run does the rest (case 3). Alternatively extract on the server and let
-case 2 register it:
+## Step 2: add the files to the repo (branch `feature-karyoscope`)
 
 ```bash
-cd <wd>/local_ref/karyoscope && tar -xzf HKS_human_CHM13_v2.tar.gz && rm HKS_human_CHM13_v2.tar.gz
+git switch feature-karyoscope
+# copy the files from the table above, then do the edits in step 3
+git add workflow/ docs/karyoscope/
+git commit -m "Add KaryoScope read annotation module"
+git push            # upstream is "all": GitHub + GitLab
 ```
 
-The reachability test from the login node (both currently time out on hilbert):
+On the server: `git pull`.
 
-```bash
-curl -4 -sS --max-time 30 -o /dev/null -w "%{http_code}\n" \
-    https://raw.githubusercontent.com/barthel-lab/KaryoScope-registry/main/registry.yaml
-curl -4 -sS -L --max-time 30 -r 0-1023 -o /dev/null -w "%{http_code}\n" \
-    "https://zenodo.org/records/21150216/files/HKS_human_CHM13_v2.tar.gz?download=1"
-```
-
-`200`/`206` = reachable. Once registered, `annotate` doesn't touch the network, so offline
-compute nodes are fine.
-
-## Installation
-
-### 1. Build the container (machine with internet and Apptainer)
-
-`karyoscope.def`:
-
-```
-Bootstrap: docker
-From: condaforge/miniforge3:25.3.1-0
-
-%labels
-    karyoscope 2.3.0 (928be8e)
-    hks 0.4.0 (04bbc52)
-
-%post
-    set -euo pipefail
-    apt-get update && apt-get install -y --no-install-recommends git ca-certificates
-    rm -rf /var/lib/apt/lists/*
-
-    # KaryoScope + its conda env (htslib, samtools, seqtk, cairo, compilers, rust, ...)
-    git clone https://github.com/barthel-lab/KaryoScope.git /opt/KaryoScope
-    git -C /opt/KaryoScope checkout 928be8e
-    mamba env create -p /opt/ks-env -f /opt/KaryoScope/environment.yml
-    mamba install -y -p /opt/ks-env -c conda-forge pandas matplotlib   # for aggregation/plots
-    /opt/ks-env/bin/pip install --no-cache-dir /opt/KaryoScope
-
-    # HKS backend, pinned exactly as in the KaryoScope README
-    git clone --recurse-submodules https://github.com/jnalanko/HKS.git /opt/HKS
-    git -C /opt/HKS checkout 04bbc52
-    git -C /opt/HKS submodule update --init --recursive
-    cp /opt/KaryoScope/native/hks/Cargo.lock /opt/HKS/Cargo.lock
-    PATH=/opt/ks-env/bin:$PATH cargo install --locked --path /opt/HKS --root /opt/ks-env
-
-    rm -rf /opt/HKS /root/.cargo/registry
-    mamba clean -afy
-
-%environment
-    export PATH=/opt/ks-env/bin:$PATH
-
-%test
-    karyoscope version
-    hks --version
-    samtools --version | head -n 1
-```
-
-```bash
-apptainer build --fakeroot karyoscope_2.3.0.sif karyoscope.def
-apptainer test karyoscope_2.3.0.sif
-rsync -P karyoscope_2.3.0.sif <server>:/path/to/containers/
-```
-
-### 2. Get the database into `local_ref/karyoscope/`
-
-Either let the workflow download it (server with internet) or copy it by hand
-(see [Manual download](#manual-download-server-without-internet-eg-hilbert)).
-
-### 3. Parameter file
-
-```yaml
-# Specify which tools to run in the pipeline. Options are: pangenie, locityper, karyoscope
-tools: "pangenie,locityper,karyoscope"
-
-# KaryoScope (read-level k-mer annotation)
-karyoscope:
-  container: /path/to/containers/karyoscope_2.3.0.sif
-  database: HKS_human_CHM13_v2
-  # SHA-256 of the database tarball (from the KaryoScope registry); used
-  # when a hand-copied tarball is found in local_ref/karyoscope/
-  database_sha256: 4da29c348aaf4bc0808adb036c8557827bee798eb306cb0030f351d0a88b977b
-  # Only shown in the error message for the manual download
-  database_url: "https://zenodo.org/records/21150216/files/HKS_human_CHM13_v2.tar.gz?download=1"
-  # Feature sets to write; empty = all six (chromosome, region, repeat,
-  # subtelomeric, gene, acrocentric). chromosome is enough for dosage QC.
-  feature_sets: "chromosome"
-```
-
-The SHA-256 is the one listed in the KaryoScope registry for v2.0.0 of the database.
-
-The FASTQ paths in the sample sheet must point to the **downsampled** files. Since PanGenie
-and locityper need the full data, KaryoScope runs with its own sample sheet and its own
-working directory (`tools: "karyoscope"`). A rough target is 1–2× coverage (~3–6 Gbp per
-sample); measure output size and runtime on one sample first.
-
-### 4. Profile
-
-The profile already has `use-apptainer: true`. The container must see the data and the
-working directory:
-
-```yaml
-apptainer-args: "--bind /pfssmain,/gpfs"
-```
-
-## Workflow changes
+## Step 3: edits to existing files
 
 ### `15-init/05_tools.smk`
 
-Add `karyoscope` to the accepted tool names and define `RUN_KARYOSCOPE`, analogous to
-`RUN_LOCITYPER`.
+`karyoscope` is added to `_AVAILABLE_TOOLS` and `RUN_KARYOSCOPE` is defined. Without a
+`tools` parameter the default stays `pangenie,locityper`: KaryoScope is opt-in, because it
+fails without a configured container.
 
 ### `00_modules.smk`
 
@@ -208,186 +143,120 @@ if RUN_KARYOSCOPE:
 
 ```python
 if RUN_KARYOSCOPE:
-    WORKFLOW_OUTPUT.extend(rules.run_all_karyoscope_annotation.input.annotations)
+    WORKFLOW_OUTPUT.extend(rules.run_all_karyoscope_annotation.input.summary)
 ```
 
-### `workflow/scripts/karyoscope_db.sh`
+### Parameter file
+
+```yaml
+# Specify which tools to run in the pipeline. Options are: pangenie, locityper, karyoscope
+tools: "karyoscope"
+
+# KaryoScope feature sets to annotate IN ADDITION to chromosome and gene.
+# Options: region, repeat, acrocentric, subtelomeric (comma-separated, empty = none)
+# This can also be set via --config karyo-features=... on the CLI instead
+karyo-features: ""
+
+# KaryoScope (read-level k-mer annotation)
+karyoscope:
+  # local .sif, or a registry URI Snakemake pulls itself (oras://..., server with internet)
+  container: /path/to/containers/karyoscope_2.3.0.sif
+  database: HKS_human_CHM13_v2
+  # checked when a hand-copied tarball is found in local_ref/karyoscope/
+  database_sha256: 4da29c348aaf4bc0808adb036c8557827bee798eb306cb0030f351d0a88b977b
+  # shown in the error message for a manual download
+  database_url: "https://zenodo.org/records/21150216/files/HKS_human_CHM13_v2.tar.gz?download=1"
+  # keep the large per-read BEDs after summarizing (false = temp())
+  keep_read_annotations: true
+  # sex call: chrY bp per million autosomal bp
+  male_y_ppm: 1000
+  female_y_ppm: 100
+  # flag a chromosome whose ratio to the cohort median deviates by more than this
+  max_deviation: 0.2
+```
+
+
+## Step 4: database on the server
+
+Nothing to do by hand if the tarball is in `local_ref/karyoscope/`. On the first run,
+`prepare_karyoscope_database` goes through these steps:
+
+1. registered in `local_ref/karyoscope/installed.json` → done
+2. extracted folder `local_ref/karyoscope/HKS_human_CHM13_v2/` present → register
+3. tarball present → check SHA-256, extract, register, delete the tarball
+4. nothing present → `karyoscope download` (only works with internet)
+5. download fails → stops with the curl command and the target folder
+
+It then touches `local_ref/karyoscope/HKS_human_CHM13_v2.ready`. This is a local rule, so it
+runs on the node Snakemake is started from, which also needs Apptainer. Disk: ~36 GB free
+during extraction, ~23 GB afterwards. KaryoScope only uses databases listed in
+`installed.json`, so a folder that is only extracted gets registered in step 2.
+
+## Step 5: sample sheet and run
+
+KaryoScope uses the **downsampled** FASTQs, while PanGenie and locityper need the full data.
+So run it in its own working directory with its own sample sheet (same format, downsampled
+paths) and `tools: "karyoscope"`.
+
+Before that, fix two things in the current enable sheet:
+
+- `K304-KB0273c_R1.fq_downsample.gz` doesn't end in `.fq.gz`. KaryoScope decides by the
+  extension whether an input is reads. Otherwise it treats the file as an assembly and keeps
+  every read name in memory, which runs out of memory on WGS. Rename it
+  (`..._R1_downsample.fq.gz`, like the other samples).
+- `68155` lists `_R1` twice.
+
+The container only sees the working directory (bound by default) and what is bound
+explicitly. The FASTQs (and anything else outside the working directory) need a bind path.
+It goes on the command line, so the profile stays unchanged. `use-apptainer: true` is
+already in the profile.
 
 ```bash
-#!/usr/bin/env bash
-# Make sure a KaryoScope database is installed and registered in DB_ROOT.
-# Usage: karyoscope_db.sh DB_ROOT DB_ID SHA256 URL MARKER
-set -euo pipefail
+BIND='--apptainer-args=--bind /pfssmain'   # comma-separated for several roots
 
-db_root=$1
-db_id=$2
-sha256=$3
-url=$4
-marker=$5
+# 1. dry run: only KaryoScope rules, no conda env creation
+snakemake -n --profile <profile> --configfile <params>.yaml "$BIND"
 
-mkdir -p "${db_root}"
-tarball="${db_root}/${db_id}.tar.gz"
+# 2. database only
+snakemake --profile <profile> --configfile <params>.yaml "$BIND" \
+    --until prepare_karyoscope_database
 
-is_registered() {
-    python3 -c 'import json, pathlib, sys
-f = pathlib.Path(sys.argv[1], "installed.json")
-sys.exit(0 if f.is_file() and sys.argv[2] in json.loads(f.read_text(encoding="utf-8")).get("databases", {}) else 1)' \
-        "${db_root}" "${db_id}"
-}
+# 3. one sample, to measure runtime, memory and output size
+snakemake --profile <profile> --configfile <params>.yaml "$BIND" \
+    <proc>/40-karyotyping/10_karyoscope/ks_sum/40936.composition.tsv
 
-if is_registered; then
-    echo "[karyoscope_db] ${db_id} already registered in ${db_root}"
-elif [[ -f "${db_root}/${db_id}/manifest.yaml" ]]; then
-    echo "[karyoscope_db] ${db_id} found extracted but unregistered, registering"
-    karyoscope register "${db_id}" --db-root "${db_root}"
-elif [[ -f "${tarball}" ]]; then
-    echo "[karyoscope_db] found ${tarball}, checking SHA-256"
-    echo "${sha256}  ${tarball}" | sha256sum -c -
-    tar -C "${db_root}" -xzf "${tarball}"
-    karyoscope register "${db_id}" --db-root "${db_root}"
-    rm -f "${tarball}"
-elif ! karyoscope download "${db_id}" --db-root "${db_root}" --quiet; then
-    cat >&2 <<EOF
-
-[karyoscope_db] ERROR: ${db_id} is not in ${db_root} and could not be downloaded
-(no internet access from this machine?).
-
-Download it on a machine with internet access:
-
-    curl -L -o ${db_id}.tar.gz "${url}"
-
-copy ${db_id}.tar.gz into ${db_root}/ and start the workflow again.
-See README_karyoscope.md, "Manual download".
-
-EOF
-    exit 1
-fi
-
-touch "${marker}"
+# 4. everything
+snakemake --profile <profile> --configfile <params>.yaml "$BIND"
 ```
 
-### `workflow/rules/40-karyotyping/10_karyoscope.smk`
+`--apptainer-args "--bind /pfssmain"` (with a space) works too; the `=` form is just the one
+that can't be misread as a separate option.
 
-```python
-import pathlib
+Resources per sample (`run_karyoscope_annotate`): `CPU_MEDIUM` threads, 24 GB (HKS keeps a
+~10 GB index in memory), 6 h, both scaled per attempt. Adjust these after the benchmark of the
+test sample (`<rsrc>/40-karyotyping/10_karyoscope/ks_annot/40936.annotate.rsrc`). A rough
+downsampling target is 1–2× coverage (~3–6 Gbp per sample).
 
+## Step 6: checks after the first cohort
 
-KARYOSCOPE_CONTAINER = config["karyoscope"]["container"]
-KARYOSCOPE_DB_ID = config["karyoscope"]["database"]
-KARYOSCOPE_DB_ROOT = DIR_LOCAL_REF.joinpath("karyoscope")
-KARYOSCOPE_FEATURE_SETS = [
-    fs for fs in str(config["karyoscope"].get("feature_sets", "")).split(",") if fs
-]
+- `inferred_sex` against the sample metadata (also a sample-swap test). If samples end up
+  `ambiguous`, look at the `y_ppm` distribution and set `male_y_ppm` / `female_y_ppm` between
+  the two clusters.
+- Autosome ratios of normal samples should sit within ~±0.05 of 1. If they're noisier, the
+  downsampling is too strong.
+- `novel_fraction` outliers: contamination or low quality.
 
-if not pathlib.Path(KARYOSCOPE_CONTAINER).is_file():
-    err_msg = f"Configured karyoscope container is not accessible: {KARYOSCOPE_CONTAINER}"
-    logerr(err_msg)
-    raise FileNotFoundError(err_msg)
+## Moving to another server
 
-SAMPLES_KARYOSCOPE = [
-    sample for sample in SAMPLES
-    if classify_sample_input_type(sample, SAMPLE_INPUT_FILES[sample]) not in (None, "cram")
-]
+The KaryoScope rules use no conda envs and no wrappers, only the container. A new server
+needs Snakemake, Apptainer (compute nodes and the node Snakemake runs on), the `.sif` and
+`local_ref/karyoscope/` (copy as is; `installed.json` stores the DB folder relative to the DB
+root). It needs no internet and no conda mirror. Then adjust `karyoscope.container`, the
+sample sheet paths, the profile (absolute script paths, account) and the `--bind` paths on
+the command line.
+If finished results move along, run once with `--rerun-triggers mtime` so changed paths in
+`params` don't trigger reruns.
 
-if not SAMPLES_KARYOSCOPE:
-    err_msg = "Error: no samples are compatible with KaryoScope annotation (need FASTQ input)."
-    logerr(err_msg)
-    raise ValueError(err_msg)
-
-
-localrules: prepare_karyoscope_database
-
-
-rule prepare_karyoscope_database:
-    """Check, download or register the KaryoScope database in local_ref/karyoscope."""
-    output:
-        ready = KARYOSCOPE_DB_ROOT.joinpath(f"{KARYOSCOPE_DB_ID}.ready")
-    log:
-        DIR_LOG.joinpath("40-karyotyping", "10_karyoscope", "ks_db", f"{KARYOSCOPE_DB_ID}.db.log")
-    container:
-        KARYOSCOPE_CONTAINER
-    params:
-        script = get_script("karyoscope_db.sh", extension="sh"),
-        db_root = KARYOSCOPE_DB_ROOT,
-        db_id = KARYOSCOPE_DB_ID,
-        sha256 = config["karyoscope"].get("database_sha256", ""),
-        url = config["karyoscope"].get("database_url", "")
-    shell:
-        "bash {params.script} {params.db_root} {params.db_id} {params.sha256}"
-            " '{params.url}' {output.ready} 2>&1 | tee {log}; exit ${{PIPESTATUS[0]}}"
-
-
-rule run_karyoscope_annotate:
-    """Annotate every read of a sample (all its FASTQ files) with 'karyoscope annotate'."""
-    input:
-        reads = lambda wildcards: SAMPLE_INPUT_FILES[wildcards.sample],
-        db_ready = rules.prepare_karyoscope_database.output.ready
-    output:
-        annot_dir = directory(
-            DIR_PROC.joinpath("40-karyotyping", "10_karyoscope", "ks_annot", "{sample}")
-        )
-    log:
-        DIR_LOG.joinpath("40-karyotyping", "10_karyoscope", "ks_annot", "{sample}.annotate.log")
-    benchmark:
-        DIR_RSRC.joinpath("40-karyotyping", "10_karyoscope", "ks_annot", "{sample}.annotate.rsrc")
-    container:
-        KARYOSCOPE_CONTAINER
-    threads: CPU_MEDIUM
-    resources:
-        mem_mb=lambda wildcards, attempt: (24 * 1024) * attempt,
-        time_hrs=lambda wildcards, attempt: 4 * attempt
-    params:
-        inputs = lambda wildcards, input: " ".join(f"-i {f}" for f in input.reads),
-        feature_sets = " ".join(f"--feature-set {fs}" for fs in KARYOSCOPE_FEATURE_SETS),
-        db_root = KARYOSCOPE_DB_ROOT,
-        db_id = KARYOSCOPE_DB_ID
-    shell:
-        "mkdir -p {output.annot_dir} && "
-        "karyoscope annotate {params.inputs} -o {output.annot_dir}"
-            " --db {params.db_id} --db-root {params.db_root} {params.feature_sets}"
-            " --no-keep-presmoothed --no-preserve-order --query-names-sidecar"
-            " --threads {threads} &> {log}"
-
-
-rule run_all_karyoscope_annotation:
-    input:
-        annotations = expand(
-            rules.run_karyoscope_annotate.output.annot_dir,
-            sample=SAMPLES_KARYOSCOPE
-        )
-```
-
-Notes on the `annotate` options:
-
-- `--no-keep-presmoothed`: write only the smoothed BEDs (halves the output).
-- `--no-preserve-order`: fastest path; read order doesn't matter for the summary.
-- `--query-names-sidecar`: writes read rank → read name per input, so single reads can be
-  traced back. R1 and R2 are separate inputs; mate *i* of R1 is mate *i* of R2.
-- `--format kst` (karyozip) would shrink the output ~20–40×, but needs karyozip in the
-  container. Only worth it if the BED size turns out to be a problem.
-- CRAM input is skipped for now (would need `--reference`, like locityper's CRAM branch).
-
-## Aggregation (next step)
-
-Not yet implemented; the format of the per-read BEDs should be checked on one real sample
-first. The planned rule `summarize_karyoscope_dosage` reads the `chromosome` BEDs of a sample
-and writes one table per sample, then one cohort table
-(`results/karyotyping/karyoscope/SAMPLES.chromosome_dosage.tsv`):
-
-- bp of k-mers per chromosome (sum of `end − start` per feature), plus `novel`
-- each chromosome relative to the autosomal median (expected ~1.0 for a disomic autosome)
-- X and Y relative dosage → inferred sex (XX: X ~1, Y ~0; XY: X ~0.5, Y > 0)
-- flags for autosomes far from 1.0 (e.g. ~1.5 = trisomy) and a high `novel` fraction
-  (contamination, low quality)
-
-The inferred sex can also be checked against the sample metadata, as a sample-swap test.
-
-## Checks after the first run
-
-- `karyoscope download --status --db-root local_ref/karyoscope` inside the container lists
-  `HKS_human_CHM13_v2`.
-- Benchmark of one sample (`.rsrc`): memory should stay near the ~10 GB index size; adjust
-  `mem_mb`, `time_hrs` and the downsampling target from there.
-- Output size per sample, before running the whole cohort.
-- The feature names in column 4 of the `chromosome` BED (chromosome naming of CHM13), as
-  input for the aggregation script.
+On a server with internet, the container can also come from a registry. Push it once with
+`apptainer push karyoscope_2.3.0.sif oras://ghcr.io/<user>/karyoscope:2.3.0` and set
+`container: oras://ghcr.io/<user>/karyoscope:2.3.0`. Snakemake pulls it on the first run.
