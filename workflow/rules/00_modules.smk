@@ -22,3 +22,7 @@ if RUN_PANGENIE:
 
 if RUN_LOCITYPER:
     include: "30-genotyping/20_locityper.smk"
+
+
+if RUN_KARYOSCOPE:
+    include: "40-karyotyping/10_karyoscope.smk"

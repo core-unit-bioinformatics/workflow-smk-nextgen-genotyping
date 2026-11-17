@@ -1,0 +1,48 @@
+Bootstrap: docker
+From: condaforge/miniforge3:26.7.2-0
+
+# KaryoScope read annotation for workflow-smk-nextgen-genotyping.
+# Build on a machine WITH internet (needs Docker Hub, GitHub, crates.io,
+# conda-forge/bioconda, PyPI), then copy the .sif to the server:
+#   sudo apptainer build karyoscope_2.3.0.sif karyoscope.def
+#   apptainer test karyoscope_2.3.0.sif
+
+%labels
+    karyoscope 2.3.0 (928be8e)
+    hks 0.4.0 (04bbc52)
+
+%post -c /bin/bash
+    set -euo pipefail
+    apt-get update
+    apt-get install -y --no-install-recommends git ca-certificates
+    rm -rf /var/lib/apt/lists/*
+
+    # KaryoScope and its conda env (python, htslib, samtools, seqtk, cairo,
+    # compilers, rust); pandas/matplotlib for later plotting
+    git clone https://github.com/barthel-lab/KaryoScope.git /opt/KaryoScope
+    git -C /opt/KaryoScope checkout 928be8e
+    mamba env create -y -p /opt/ks-env -f /opt/KaryoScope/environment.yml
+    mamba install -y -p /opt/ks-env -c conda-forge pandas matplotlib
+    /opt/ks-env/bin/pip install --no-cache-dir /opt/KaryoScope
+
+    # HKS query backend, pinned exactly as in the KaryoScope README
+    git clone --recurse-submodules https://github.com/jnalanko/HKS.git /opt/HKS
+    git -C /opt/HKS checkout 04bbc52
+    git -C /opt/HKS submodule update --init --recursive
+    cp /opt/KaryoScope/native/hks/Cargo.lock /opt/HKS/Cargo.lock
+    PATH=/opt/ks-env/bin:$PATH cargo install --locked --path /opt/HKS --root /opt/ks-env
+
+    # keep the image small
+    rm -rf /opt/HKS /root/.cargo/registry /root/.cargo/git
+    mamba clean -afy
+
+%environment
+    export PATH=/opt/ks-env/bin:$PATH
+    export LC_ALL=C.UTF-8
+
+%test
+    karyoscope version
+    hks --help > /dev/null
+    samtools --version | head -n 1
+    bgzip --version | head -n 1
+    python3 -c "import pandas, matplotlib"

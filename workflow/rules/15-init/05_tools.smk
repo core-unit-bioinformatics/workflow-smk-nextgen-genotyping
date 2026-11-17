@@ -3,17 +3,20 @@ Determine which tool(s) of the pipeline should be executed
 for this run. Controlled via the mandatory 'tools' config
 parameter, e.g.:
     snakemake [...] --config tools=pangenie,locityper
-Available tools: pangenie, locityper
+Available tools: pangenie, locityper, karyoscope
+Default (no 'tools' given): pangenie, locityper. KaryoScope is opt-in
+because it needs its own container and database.
 """
 
-_AVAILABLE_TOOLS = {"pangenie", "locityper"}
+_AVAILABLE_TOOLS = {"pangenie", "locityper", "karyoscope"}
+_DEFAULT_TOOLS = {"pangenie", "locityper"}
 
 if "tools" not in config or not str(config["tools"]).strip():
-    TOOLS_LIST = sorted(_AVAILABLE_TOOLS)
+    TOOLS_LIST = sorted(_DEFAULT_TOOLS)
     logout(
         "No 'tools' parameter was provided on the command line "
         "(--config tools=...) or in the config file. Defaulting to "
-        f"running all available tools: {TOOLS_LIST}"
+        f"running the default tools: {TOOLS_LIST}"
     )
 else:
     TOOLS_LIST = sorted(set(
@@ -37,3 +40,4 @@ if not TOOLS_LIST:
 
 RUN_PANGENIE = "pangenie" in TOOLS_LIST
 RUN_LOCITYPER = "locityper" in TOOLS_LIST
+RUN_KARYOSCOPE = "karyoscope" in TOOLS_LIST

@@ -20,3 +20,5 @@ if RUN_PANGENIE:
 if RUN_LOCITYPER:
     WORKFLOW_OUTPUT.extend(rules.run_all_locityper_genotyping.input.csv)
 
+if RUN_KARYOSCOPE:
+    WORKFLOW_OUTPUT.extend(rules.run_all_karyoscope_annotation.input.summary)
