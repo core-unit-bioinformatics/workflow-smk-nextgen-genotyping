@@ -1,15 +1,3 @@
-"""
-KaryoScope read annotation (3rd tool next to PanGenie and locityper).
-
-Every k-mer of every read is labelled against the KaryoScope database
-(chromosome of origin, gene structure, ...); the per-read BEDs are then
-condensed into per-sample and cohort tables (composition per feature set,
-chromosome dosage, inferred sex).
-
-All rules run in the KaryoScope Apptainer image (config: karyoscope.container);
-no conda env is used. See docs/karyoscope/README.md.
-"""
-
 import pathlib
 
 

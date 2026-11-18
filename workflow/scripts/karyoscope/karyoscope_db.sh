@@ -2,7 +2,7 @@
 # Make sure a KaryoScope database is installed and registered in DB_ROOT.
 #
 # Order of checks:
-#   1. registered in DB_ROOT/installed.json        -> nothing to do
+#   1. registered in DB_ROOT/installed.json          -> nothing to do
 #   2. extracted folder DB_ROOT/DB_ID present        -> register it
 #   3. tarball DB_ROOT/DB_ID.tar.gz present          -> verify, extract, register
 #   4. nothing present                               -> karyoscope download
