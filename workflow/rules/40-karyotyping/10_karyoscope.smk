@@ -128,7 +128,7 @@ rule run_karyoscope_annotate:
     threads: CPU_MEDIUM
     resources:
         mem_mb=lambda wildcards, attempt: (24 * 1024) * attempt,
-        time_hrs=lambda wildcards, attempt: 6 * attempt
+        time_hrs=lambda wildcards, attempt: 24 * attempt
     params:
         inputs = lambda wildcards, input: " ".join(f"-i {f}" for f in input.reads),
         feature_sets = " ".join(f"--feature-set {fs}" for fs in KARYOSCOPE_FEATURE_SETS),
@@ -158,8 +158,8 @@ rule summarize_karyoscope_sample:
         KARYOSCOPE_CONTAINER
     threads: CPU_LOW
     resources:
-        mem_mb=lambda wildcards, attempt: 2048 * attempt,
-        time_hrs=lambda wildcards, attempt: 2 * attempt
+        mem_mb=lambda wildcards, attempt: (4 * 1024) * attempt,
+        time_hrs=lambda wildcards, attempt: 12 * attempt
     params:
         script = get_script("karyoscope_summarize.py"),
         db_id = KARYOSCOPE_DB_ID,
