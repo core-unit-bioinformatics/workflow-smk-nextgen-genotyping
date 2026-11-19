@@ -82,10 +82,17 @@ karyoscope:
   database_url: "https://zenodo.org/records/21150216/files/HKS_human_CHM13_v2.tar.gz?download=1"
   # keep the large per-read BEDs after summarizing (false = temp())
   keep_read_annotations: true
-  # sex call: chrY bp per million autosomal bp
+  # sex call, part 1 - Y: chrY bp per million autosomal bp 
+  # >= male_y_ppm: Y present; 
+  # <= female_y_ppm: Y absent; in between: ambiguous
   male_y_ppm: 1000
-  female_y_ppm: 100
-  # flag a chromosome whose ratio to the cohort median deviates by more than this
+  female_y_ppm: 500
+  # sex call, part 2 - X: expected chrX bp / autosomal bp for TWO X copies
+  # (x_copies = 2 * chrX_share / x_diploid_share); a copy estimate further
+  # than x_copy_tolerance from a whole number is called ambiguous
+  x_diploid_share: 0.053
+  x_copy_tolerance: 0.25
+  # flag an autosome whose ratio to the cohort median deviates by more than this
   max_deviation: 0.2
 
 # Maximum total temp disk space (in MB) the workflow may use at once

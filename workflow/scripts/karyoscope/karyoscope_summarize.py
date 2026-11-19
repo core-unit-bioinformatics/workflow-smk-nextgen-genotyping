@@ -19,7 +19,19 @@ AUTOSOMES = [f"chr{i}" for i in range(1, 23)]
 CHR_X = "chrX"
 CHR_Y = "chrY"
 NOVEL = "novel"
-SAMPLE_TABLE_SUFFIX = ".composition.tsv"
+
+# Output order of the labels per feature set (hierarchy of the CHM13 database).
+# Labels not listed here follow alphabetically; "none" (chrM) and "novel" last.
+LABEL_ORDER = {
+    "chromosome": [
+        "categorized",
+        "autosome", "metacentric", "submetacentric", "acrocentric",
+        *AUTOSOMES,
+        "sex", CHR_X, CHR_Y,
+    ],
+    "gene": ["exon", "intron", "intergenic"],
+}  # fmt: skip
+TAIL_LABELS = ["none", NOVEL]
 
 
 def parse_args():
@@ -43,13 +55,25 @@ def parse_args():
         "--male-y-ppm",
         type=float,
         default=1000.0,
-        help="chrY bp per million autosomal bp at or above which a sample is male",
+        help="chrY ppm of autosomal bp at or above which Y counts as present",
     )
     coh.add_argument(
         "--female-y-ppm",
         type=float,
-        default=100.0,
-        help="chrY bp per million autosomal bp at or below which a sample is female",
+        default=500.0,
+        help="chrY ppm of autosomal bp at or below which Y counts as absent",
+    )
+    coh.add_argument(
+        "--x-diploid-share",
+        type=float,
+        default=0.053,
+        help="expected chrX bp / autosomal bp for two X copies",
+    )
+    coh.add_argument(
+        "--x-copy-tolerance",
+        type=float,
+        default=0.25,
+        help="max distance of the X copy estimate from a whole number",
     )
     coh.add_argument(
         "--max-deviation",
@@ -58,6 +82,15 @@ def parse_args():
         help="flag a chromosome whose ratio to the cohort median deviates more",
     )
     return parser.parse_args()
+
+
+def order_labels(feature_set, labels):
+    """Sort labels hierarchically for a feature set, unknown ones alphabetically."""
+    labels = set(labels)
+    known = [lb for lb in LABEL_ORDER.get(feature_set, []) if lb in labels]
+    tail = [lb for lb in TAIL_LABELS if lb in labels]
+    rest = sorted(labels - set(known) - set(tail))
+    return known + rest + tail
 
 
 def count_labels(bed_path, threads):
@@ -91,7 +124,8 @@ def summarize_sample(args):
             print(f"[summarize] {bed_file.name}", file=sys.stderr)
             counts.update(count_labels(bed_file, args.threads))
         total = sum(counts.values())
-        for label, bp in sorted(counts.items()):
+        for label in order_labels(feature_set, counts):
+            bp = counts[label]
             fraction = bp / total if total else 0.0
             rows.append([args.sample, feature_set, label, bp, f"{fraction:.8f}"])
 
@@ -124,7 +158,9 @@ def write_tsv(path, header, rows):
 
 def write_composition(data, feature_set, path):
     """Write a wide sample x label table of fractions for one feature set."""
-    labels = sorted({label for s in data.values() for label in s.get(feature_set, {})})
+    labels = order_labels(
+        feature_set, {label for s in data.values() for label in s.get(feature_set, {})}
+    )
     rows = []
     for sample in sorted(data):
         counts = data[sample].get(feature_set, {})
@@ -148,8 +184,30 @@ def fmt(value, digits=4):
     return "NA" if value is None else f"{value:.{digits}f}"
 
 
+def call_sex_chromosomes(x_copies, y_ppm, args):
+    """Return (y_status, sex_chromosomes, inferred_sex) from X dosage and Y signal."""
+    if y_ppm >= args.male_y_ppm:
+        y_status = "present"
+    elif y_ppm <= args.female_y_ppm:
+        y_status = "absent"
+    else:
+        y_status = "ambiguous"
+
+    x_count = round(x_copies)
+    if x_count < 1 or abs(x_copies - x_count) > args.x_copy_tolerance:
+        x_count = None
+
+    if x_count is None or y_status == "ambiguous":
+        return y_status, "ambiguous", "ambiguous"
+    sex_chromosomes = "X" * x_count + ("Y" if y_status == "present" else "")
+    if sex_chromosomes == "X":
+        sex_chromosomes = "X0"
+    inferred_sex = {"XX": "female", "XY": "male"}.get(sex_chromosomes, "atypical")
+    return y_status, sex_chromosomes, inferred_sex
+
+
 def write_dosage(data, args, path):
-    """Write per-sample chromosome dosage ratios, inferred sex and QC flags."""
+    """Write per-sample chromosome dosage, X/Y shares, sex call and QC flags."""
     metrics = {}
     for sample, per_set in data.items():
         counts = per_set.get("chromosome", {})
@@ -157,60 +215,64 @@ def write_dosage(data, args, path):
         if autosomal == 0:
             raise ValueError(f"{sample}: no autosomal k-mers in the chromosome set")
         total = sum(counts.values())
+        x_share = counts.get(CHR_X, 0) / autosomal
+        y_share = counts.get(CHR_Y, 0) / autosomal
+        x_copies = 2 * x_share / args.x_diploid_share
+        y_status, sex_chromosomes, inferred_sex = call_sex_chromosomes(
+            x_copies, y_share * 1e6, args
+        )
         metrics[sample] = {
             "total": total,
             "autosomal": autosomal,
             "novel": counts.get(NOVEL, 0) / total,
             "share": {c: counts.get(c, 0) / autosomal for c in AUTOSOMES},
-            "x_to_auto": counts.get(CHR_X, 0) / autosomal,
-            "y_ppm": counts.get(CHR_Y, 0) / autosomal * 1e6,
+            "x_share": x_share,
+            "y_share": y_share,
+            "x_copies": x_copies,
+            "y_status": y_status,
+            "sex_chromosomes": sex_chromosomes,
+            "inferred_sex": inferred_sex,
         }
 
     if len(metrics) < 5:
         print(
             f"[summarize] WARNING: only {len(metrics)} samples, cohort medians are "
-            "not a reliable baseline for the dosage ratios",
+            "not a reliable baseline for the autosome ratios",
             file=sys.stderr,
         )
 
     median_share = {
         c: statistics.median(m["share"][c] for m in metrics.values()) for c in AUTOSOMES
     }
-    for m in metrics.values():
-        if m["y_ppm"] >= args.male_y_ppm:
-            m["sex"] = "male"
-        elif m["y_ppm"] <= args.female_y_ppm:
-            m["sex"] = "female"
-        else:
-            m["sex"] = "ambiguous"
-    median_x = {}
-    for sex in ("male", "female"):
-        values = [m["x_to_auto"] for m in metrics.values() if m["sex"] == sex]
-        median_x[sex] = statistics.median(values) if values else None
 
     header = [
-        "sample", "total_bp", "autosomal_bp", "novel_fraction",
-        *AUTOSOMES, "x_to_autosomes", "y_ppm", "inferred_sex", "x_ratio", "flags",
+        "sample", "total_bp", "autosomal_bp", "autosomal_fraction", "novel_fraction",
+        *AUTOSOMES,
+        "chrX_share", "chrX_ppm", "chrY_share", "chrY_ppm",
+        "x_copies", "y_status", "sex_chromosomes", "inferred_sex", "flags",
     ]  # fmt: skip
     rows = []
     for sample in sorted(metrics):
         m = metrics[sample]
         ratios = {c: ratio(m["share"][c], median_share[c]) for c in AUTOSOMES}
-        x_ratio = ratio(m["x_to_auto"], median_x.get(m["sex"]))
         flags = [
             f"{c}:{r:.2f}"
             for c, r in ratios.items()
             if r is not None and abs(r - 1) > args.max_deviation
         ]
-        if x_ratio is not None and abs(x_ratio - 1) > args.max_deviation:
-            flags.append(f"{CHR_X}:{x_ratio:.2f}")
-        if m["sex"] == "ambiguous":
-            flags.append("sex:ambiguous")
+        if m["sex_chromosomes"] not in ("XX", "XY"):
+            flags.append(
+                f"sex:{m['sex_chromosomes']}"
+                f"(x_copies={m['x_copies']:.2f},y={m['y_status']})"
+            )
         rows.append([
-            sample, m["total"], m["autosomal"], fmt(m["novel"], 6),
+            sample, m["total"], m["autosomal"], fmt(m["autosomal"] / m["total"], 6),
+            fmt(m["novel"], 6),
             *(fmt(ratios[c]) for c in AUTOSOMES),
-            fmt(m["x_to_auto"], 6), fmt(m["y_ppm"], 1), m["sex"], fmt(x_ratio),
-            ";".join(flags) if flags else ".",
+            fmt(m["x_share"], 6), fmt(m["x_share"] * 1e6, 1),
+            fmt(m["y_share"], 8), fmt(m["y_share"] * 1e6, 1),
+            fmt(m["x_copies"], 2), m["y_status"], m["sex_chromosomes"],
+            m["inferred_sex"], ";".join(flags) if flags else ".",
         ])  # fmt: skip
     write_tsv(path, header, rows)
 

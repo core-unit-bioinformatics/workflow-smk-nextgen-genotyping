@@ -15,7 +15,9 @@ KARYOSCOPE_DB_SHA256 = str(_KS_CONFIG.get("database_sha256", "") or "")
 KARYOSCOPE_DB_URL = str(_KS_CONFIG.get("database_url", "") or "")
 KARYOSCOPE_KEEP_READ_ANNOTATIONS = bool(_KS_CONFIG.get("keep_read_annotations", True))
 KARYOSCOPE_MALE_Y_PPM = float(_KS_CONFIG.get("male_y_ppm", 1000))
-KARYOSCOPE_FEMALE_Y_PPM = float(_KS_CONFIG.get("female_y_ppm", 100))
+KARYOSCOPE_FEMALE_Y_PPM = float(_KS_CONFIG.get("female_y_ppm", 500))
+KARYOSCOPE_X_DIPLOID_SHARE = float(_KS_CONFIG.get("x_diploid_share", 0.053))
+KARYOSCOPE_X_COPY_TOLERANCE = float(_KS_CONFIG.get("x_copy_tolerance", 0.25))
 KARYOSCOPE_MAX_DEVIATION = float(_KS_CONFIG.get("max_deviation", 0.2))
 KARYOSCOPE_DB_ROOT = DIR_LOCAL_REF.joinpath("karyoscope")
 
@@ -125,10 +127,10 @@ rule run_karyoscope_annotate:
         DIR_RSRC.joinpath("40-karyotyping", "10_karyoscope", "ks_annot", "{sample}.annotate.rsrc")
     container:
         KARYOSCOPE_CONTAINER
-    threads: CPU_MEDIUM
+    threads: CPU_HIGH
     resources:
         mem_mb=lambda wildcards, attempt: (24 * 1024) * attempt,
-        time_hrs=lambda wildcards, attempt: 24 * attempt
+        time_hrs=lambda wildcards, attempt: 12 * attempt
     params:
         inputs = lambda wildcards, input: " ".join(f"-i {f}" for f in input.reads),
         feature_sets = " ".join(f"--feature-set {fs}" for fs in KARYOSCOPE_FEATURE_SETS),
@@ -158,8 +160,8 @@ rule summarize_karyoscope_sample:
         KARYOSCOPE_CONTAINER
     threads: CPU_LOW
     resources:
-        mem_mb=lambda wildcards, attempt: (4 * 1024) * attempt,
-        time_hrs=lambda wildcards, attempt: 12 * attempt
+        mem_mb=lambda wildcards, attempt: (8 * 1024) * attempt,
+        time_hrs=lambda wildcards, attempt: 6 * attempt
     params:
         script = get_script("karyoscope_summarize.py"),
         db_id = KARYOSCOPE_DB_ID,
@@ -194,19 +196,23 @@ rule merge_karyoscope_cohort:
     threads: CPU_LOW
     resources:
         mem_mb=lambda wildcards, attempt: 2048 * attempt,
-        time_hrs=lambda wildcards, attempt: 1 * attempt
+        time_hrs=lambda wildcards, attempt: 2 * attempt
     params:
         script = get_script("karyoscope_summarize.py"),
         outdir = lambda wildcards, output: pathlib.Path(output.dosage).parent,
         feature_sets = ",".join(KARYOSCOPE_FEATURE_SETS),
         male_y_ppm = KARYOSCOPE_MALE_Y_PPM,
         female_y_ppm = KARYOSCOPE_FEMALE_Y_PPM,
-        max_deviation = KARYOSCOPE_MAX_DEVIATION
+        max_deviation = KARYOSCOPE_MAX_DEVIATION,
+        x_diploid_share = KARYOSCOPE_X_DIPLOID_SHARE,
+        x_copy_tolerance = KARYOSCOPE_X_COPY_TOLERANCE
     shell:
         "python3 {params.script} cohort --inputs {input.tables}"
             " --feature-sets {params.feature_sets} --outdir {params.outdir}"
             " --male-y-ppm {params.male_y_ppm} --female-y-ppm {params.female_y_ppm}"
-            " --max-deviation {params.max_deviation} &> {log}"
+            " --max-deviation {params.max_deviation}"
+            " --x-diploid-share {params.x_diploid_share}"
+            " --x-copy-tolerance {params.x_copy_tolerance} &> {log}"
 
 
 rule run_all_karyoscope_annotation:
