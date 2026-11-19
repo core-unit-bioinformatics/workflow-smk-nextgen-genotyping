@@ -78,11 +78,11 @@ deleted once the sample is summarized.
 | `autosomal_bp`, `autosomal_fraction` | bp labelled `chr1`–`chr22` exactly (no group labels), and their share of `total_bp` |
 | `novel_fraction` | share of `novel`; high values point to contamination or poor quality |
 | `chr1` … `chr22` | the chromosome's share of `autosomal_bp`, divided by the cohort median. ~1.0 = normal, ~1.5 = trisomy, ~0.5 = monosomy |
-| `chrX_share`, `chrX_ppm` | chrX bp / `autosomal_bp`, as a share and per million |
-| `chrY_share`, `chrY_ppm` | the same for chrY |
-| `x_copies` | estimated number of X copies: `2 × chrX_share / x_diploid_share` (~2 for XX, ~1 for XY) |
-| `y_status` | `present` (`chrY_ppm` ≥ `male_y_ppm`), `absent` (≤ `female_y_ppm`), else `ambiguous` |
-| `sex_chromosomes` | from rounded `x_copies` and `y_status`: `XX`, `XY`, `X0`, `XXY`, `XXX`, … or `ambiguous` |
+| `chrX_ppm` | chrX bp per million `autosomal_bp` (not cohort-normalised, unlike `chr1`…`chr22`) |
+| `chrX_copies` | estimated X copies: `2 × chrX_ppm / x_diploid_ppm` (~2 for XX, ~1 for XY) |
+| `chrY_ppm` | chrY bp per million `autosomal_bp` |
+| `chrY_copies` | estimated Y copies: `chrY_ppm / y_haploid_ppm` (~0 for XX, ~1 for XY); display only until `y_haploid_ppm` is calibrated |
+| `sex_chromosomes` | from rounded `chrX_copies` and the Y ppm thresholds (Y present ≥ `male_y_ppm`, absent ≤ `female_y_ppm`, else ambiguous): `XX`, `XY`, `X0`, `XXY`, `XXX`, … or `ambiguous` |
 | `inferred_sex` | `female` (XX), `male` (XY), `atypical` (any other combination), `ambiguous` |
 | `flags` | autosomes deviating from 1 by more than `max_deviation`, plus `sex:<call>(...)` for anything other than XX/XY; `.` = none |
 
@@ -90,8 +90,8 @@ All values are fractions, so they don't depend on sequencing depth. X and Y use 
 denominator (`autosomal_bp`) as the autosome shares, so the sex call works per sample and
 doesn't depend on the cohort's sex ratio. The autosome ratios use the **cohort median** as
 the baseline, so they need several samples (warning below 5) and assume most samples are
-normal. `x_diploid_share` (0.053) comes from the chrX/autosome length ratio of CHM13 and the
-first female test sample (0.0527); check it and the Y thresholds on the first cohort (step 6).
+normal. `x_diploid_ppm` (53000) comes from the chrX/autosome length ratio of CHM13 and the
+first female test sample (52745); check it and the Y thresholds on the first cohort (step 6).
 
 ## Step 1: container and database (machine with internet)
 
@@ -182,11 +182,15 @@ karyoscope:
   # >= male_y_ppm: Y present; <= female_y_ppm: Y absent; in between: ambiguous
   male_y_ppm: 1000
   female_y_ppm: 500
-  # sex call, part 2 - X: expected chrX bp / autosomal bp for TWO X copies
-  # (x_copies = 2 * chrX_share / x_diploid_share); a copy estimate further
+  # sex call, part 2 - X: expected chrX ppm of autosomal bp for TWO X copies
+  # (chrX_copies = 2 * chrX_ppm / x_diploid_ppm); a copy estimate further
   # than x_copy_tolerance from a whole number is called ambiguous
-  x_diploid_share: 0.053
+  x_diploid_ppm: 53000
   x_copy_tolerance: 0.25
+  # expected chrY ppm of autosomal bp for ONE Y copy, only used for the
+  # chrY_copies column (the Y part of the sex call uses the ppm thresholds);
+  # rough estimate - set it to chrY_ppm of the first confirmed XY sample
+  y_haploid_ppm: 3500
   # flag an autosome whose ratio to the cohort median deviates by more than this
   max_deviation: 0.2
 ```
@@ -257,8 +261,9 @@ downsampling target is 1–2× coverage (~3–6 Gbp per sample).
 
 - `inferred_sex` against the sample metadata (also a sample-swap test). If samples end up
   `ambiguous`: plot `chrY_ppm` (log scale) and set `male_y_ppm` / `female_y_ppm` between the
-  two clusters; check that `x_copies` clusters around 1 and 2, otherwise adjust
-  `x_diploid_share` to the median `chrX_share` of the confirmed females.
+  two clusters; check that `chrX_copies` clusters around 1 and 2, otherwise adjust
+  `x_diploid_ppm` to the median `chrX_ppm` of the confirmed females. Set
+  `y_haploid_ppm` to the median `chrY_ppm` of the confirmed males.
 - Autosome ratios of normal samples should sit within ~±0.05 of 1. If they're noisier, the
   downsampling is too strong.
 - `novel_fraction` outliers: contamination or low quality.

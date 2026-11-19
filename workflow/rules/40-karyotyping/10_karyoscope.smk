@@ -16,8 +16,9 @@ KARYOSCOPE_DB_URL = str(_KS_CONFIG.get("database_url", "") or "")
 KARYOSCOPE_KEEP_READ_ANNOTATIONS = bool(_KS_CONFIG.get("keep_read_annotations", True))
 KARYOSCOPE_MALE_Y_PPM = float(_KS_CONFIG.get("male_y_ppm", 1000))
 KARYOSCOPE_FEMALE_Y_PPM = float(_KS_CONFIG.get("female_y_ppm", 500))
-KARYOSCOPE_X_DIPLOID_SHARE = float(_KS_CONFIG.get("x_diploid_share", 0.053))
+KARYOSCOPE_X_DIPLOID_PPM = float(_KS_CONFIG.get("x_diploid_ppm", 53000))
 KARYOSCOPE_X_COPY_TOLERANCE = float(_KS_CONFIG.get("x_copy_tolerance", 0.25))
+KARYOSCOPE_Y_HAPLOID_PPM = float(_KS_CONFIG.get("y_haploid_ppm", 3500))
 KARYOSCOPE_MAX_DEVIATION = float(_KS_CONFIG.get("max_deviation", 0.2))
 KARYOSCOPE_DB_ROOT = DIR_LOCAL_REF.joinpath("karyoscope")
 
@@ -204,15 +205,17 @@ rule merge_karyoscope_cohort:
         male_y_ppm = KARYOSCOPE_MALE_Y_PPM,
         female_y_ppm = KARYOSCOPE_FEMALE_Y_PPM,
         max_deviation = KARYOSCOPE_MAX_DEVIATION,
-        x_diploid_share = KARYOSCOPE_X_DIPLOID_SHARE,
-        x_copy_tolerance = KARYOSCOPE_X_COPY_TOLERANCE
+        x_diploid_ppm = KARYOSCOPE_X_DIPLOID_PPM,
+        x_copy_tolerance = KARYOSCOPE_X_COPY_TOLERANCE,
+        y_haploid_ppm = KARYOSCOPE_Y_HAPLOID_PPM
     shell:
         "python3 {params.script} cohort --inputs {input.tables}"
             " --feature-sets {params.feature_sets} --outdir {params.outdir}"
             " --male-y-ppm {params.male_y_ppm} --female-y-ppm {params.female_y_ppm}"
             " --max-deviation {params.max_deviation}"
-            " --x-diploid-share {params.x_diploid_share}"
-            " --x-copy-tolerance {params.x_copy_tolerance} &> {log}"
+            " --x-diploid-ppm {params.x_diploid_ppm}"
+            " --x-copy-tolerance {params.x_copy_tolerance}"
+            " --y-haploid-ppm {params.y_haploid_ppm} &> {log}"
 
 
 rule run_all_karyoscope_annotation:

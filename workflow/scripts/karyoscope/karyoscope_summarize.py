@@ -64,10 +64,16 @@ def parse_args():
         help="chrY ppm of autosomal bp at or below which Y counts as absent",
     )
     coh.add_argument(
-        "--x-diploid-share",
+        "--x-diploid-ppm",
         type=float,
-        default=0.053,
-        help="expected chrX bp / autosomal bp for two X copies",
+        default=53000.0,
+        help="expected chrX ppm of autosomal bp for two X copies",
+    )
+    coh.add_argument(
+        "--y-haploid-ppm",
+        type=float,
+        default=3500.0,
+        help="expected chrY ppm of autosomal bp for ONE Y copy (display only)",
     )
     coh.add_argument(
         "--x-copy-tolerance",
@@ -207,7 +213,7 @@ def call_sex_chromosomes(x_copies, y_ppm, args):
 
 
 def write_dosage(data, args, path):
-    """Write per-sample chromosome dosage, X/Y shares, sex call and QC flags."""
+    """Write per-sample chromosome dosage, X/Y ratios and copies, sex call, flags."""
     metrics = {}
     for sample, per_set in data.items():
         counts = per_set.get("chromosome", {})
@@ -215,20 +221,22 @@ def write_dosage(data, args, path):
         if autosomal == 0:
             raise ValueError(f"{sample}: no autosomal k-mers in the chromosome set")
         total = sum(counts.values())
-        x_share = counts.get(CHR_X, 0) / autosomal
-        y_share = counts.get(CHR_Y, 0) / autosomal
-        x_copies = 2 * x_share / args.x_diploid_share
+        x_ppm = counts.get(CHR_X, 0) / autosomal * 1e6
+        y_ppm = counts.get(CHR_Y, 0) / autosomal * 1e6
+        x_copies = 2 * x_ppm / args.x_diploid_ppm
+        y_copies = y_ppm / args.y_haploid_ppm
         y_status, sex_chromosomes, inferred_sex = call_sex_chromosomes(
-            x_copies, y_share * 1e6, args
+            x_copies, y_ppm, args
         )
         metrics[sample] = {
             "total": total,
             "autosomal": autosomal,
             "novel": counts.get(NOVEL, 0) / total,
             "share": {c: counts.get(c, 0) / autosomal for c in AUTOSOMES},
-            "x_share": x_share,
-            "y_share": y_share,
+            "x_ppm": x_ppm,
+            "y_ppm": y_ppm,
             "x_copies": x_copies,
+            "y_copies": y_copies,
             "y_status": y_status,
             "sex_chromosomes": sex_chromosomes,
             "inferred_sex": inferred_sex,
@@ -248,8 +256,9 @@ def write_dosage(data, args, path):
     header = [
         "sample", "total_bp", "autosomal_bp", "autosomal_fraction", "novel_fraction",
         *AUTOSOMES,
-        "chrX_share", "chrX_ppm", "chrY_share", "chrY_ppm",
-        "x_copies", "y_status", "sex_chromosomes", "inferred_sex", "flags",
+        "chrX_ppm", "chrX_copies",
+        "chrY_ppm", "chrY_copies",
+        "sex_chromosomes", "inferred_sex", "flags",
     ]  # fmt: skip
     rows = []
     for sample in sorted(metrics):
@@ -263,15 +272,16 @@ def write_dosage(data, args, path):
         if m["sex_chromosomes"] not in ("XX", "XY"):
             flags.append(
                 f"sex:{m['sex_chromosomes']}"
-                f"(x_copies={m['x_copies']:.2f},y={m['y_status']})"
+                f"(chrX_copies={m['x_copies']:.2f},chrY_copies={m['y_copies']:.2f},"
+                f"y={m['y_status']})"
             )
         rows.append([
             sample, m["total"], m["autosomal"], fmt(m["autosomal"] / m["total"], 6),
             fmt(m["novel"], 6),
             *(fmt(ratios[c]) for c in AUTOSOMES),
-            fmt(m["x_share"], 6), fmt(m["x_share"] * 1e6, 1),
-            fmt(m["y_share"], 8), fmt(m["y_share"] * 1e6, 1),
-            fmt(m["x_copies"], 2), m["y_status"], m["sex_chromosomes"],
+            fmt(m["x_ppm"], 1), fmt(m["x_copies"], 2),
+            fmt(m["y_ppm"], 1), fmt(m["y_copies"], 2),
+            m["sex_chromosomes"],
             m["inferred_sex"], ";".join(flags) if flags else ".",
         ])  # fmt: skip
     write_tsv(path, header, rows)
