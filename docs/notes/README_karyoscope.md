@@ -35,6 +35,7 @@ first run only (database not present):
   build_karyoscope_database    cluster job (~80 GB RAM): build + register the database
 database already present (folder or tarball in local_ref/karyoscope/):
   prepare_karyoscope_database  local rule: register, check the feature sets
+                               (no job at all once the database is registered and marked ready)
 
 per sample (FASTQ, downsampled):
   run_karyoscope_annotate      one smoothed BED per FASTQ and feature set

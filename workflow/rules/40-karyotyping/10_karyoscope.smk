@@ -255,6 +255,14 @@ if KARYOSCOPE_DB_STATE == "build":
                 " {params.bin_size_mb} {threads} {params.mem_gigas} '{params.feature_beds}'"
                 " '{output.ready}' &> {log}"
 
+elif KARYOSCOPE_DB_STATE == "registered" and KARYOSCOPE_DB_READY.is_file():
+
+    # registered and marked ready: the feature sets were checked above against
+    # its manifest, so no rule is needed. Defining one here would make
+    # Snakemake re-run it whenever the marker came from another rule (e.g.
+    # build_karyoscope_database), and hold back everything downstream.
+    pass
+
 else:
 
     localrules: prepare_karyoscope_database
