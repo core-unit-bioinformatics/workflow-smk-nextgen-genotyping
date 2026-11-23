@@ -194,7 +194,7 @@ curl -L -o chm13v2.0_cytobands_allchrs.bed \
 
 sha256sum -c - <<'EOF'
 c6f35d83e4b28f33807c2f65df76b78444f246aa9fb82a3c262bde35e6a6a78c  chm13v2.0.cenSatv2.1.bed
-fd8a27c06da23b4defc140d1bb03f5f0eb8b5ba780eeee6730617fe709c6a16e  CHM13.gtf.gz
+a72e1bc4a219b35cdde0f56c3a1333c4137e72e751390dfe30e2046ef115863e  CHM13.gtf.gz
 EOF
 head -3 chm13v2.0_cytobands_allchrs.bed    # chr1  0  ...  p36.33  gneg
 ```
@@ -217,9 +217,10 @@ snakemake --profile <profile> --configfile <params>.yaml "$BIND" \
     --until build_karyoscope_database
 ```
 
-Build job: 16 threads, 128 GB, 4 h (`build_threads`, `build_mem_gb`); KaryoScope measured
-~20 min and ~80 GB peak for a comparable CHM13 build. With little RAM, set
-`build_external_memory` to a scratch directory: ~6× less memory, ~1.4× the time. Disk:
+Build job (`build_karyoscope_database`): 16 threads, 128 GB, 4 h, set in the rule like all
+other resources. KaryoScope measured ~20 min and ~80 GB peak for a comparable CHM13 build.
+On a machine with little RAM, `karyoscope_build_db.sh` takes an optional last argument, a
+scratch directory for HKS's external-memory mode (~6× less memory, ~1.4× the time). Disk:
 ~60 GB free in `local_ref/karyoscope/` during the build, ~25 GB afterwards. The build log is
 `log/40-karyotyping/10_karyoscope/ks_db/HKS_CHM13v2_karyo.build.log`; the small build inputs
 (spec, hierarchies) stay in `local_ref/karyoscope/HKS_CHM13v2_karyo/build_inputs/`.
@@ -265,12 +266,8 @@ karyoscope:
   # always-annotated feature sets; the summary needs chromosome (chromosome
   # dosage, sex), cytoband (arm and band dosage) and bins_1mb (bin dosage)
   default_features: "chromosome,gene,cytoband,bins_1mb"
-  # database build (only when the database is not present)
+  # bin size of the bins_<N>mb feature set (database build only)
   bin_size_mb: 1
-  build_threads: 16
-  build_mem_gb: 128
-  build_mem_gigas: 32
-  build_external_memory: ""
   # keep the large per-read BEDs after summarizing (false = temp())
   keep_read_annotations: true
   # samples whose median is the baseline for all ratios (default: all samples);

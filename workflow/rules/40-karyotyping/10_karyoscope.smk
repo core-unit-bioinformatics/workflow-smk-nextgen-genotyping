@@ -19,10 +19,6 @@ KARYOSCOPE_CONTAINER = str(_KS_CONFIG.get("container", "") or "")
 KARYOSCOPE_DB_ID = str(_KS_CONFIG.get("database", "HKS_CHM13v2_karyo"))
 KARYOSCOPE_DB_SHA256 = str(_KS_CONFIG.get("database_sha256", "") or "")
 KARYOSCOPE_BIN_SIZE_MB = int(_KS_CONFIG.get("bin_size_mb", 1))
-KARYOSCOPE_BUILD_THREADS = int(_KS_CONFIG.get("build_threads", 16))
-KARYOSCOPE_BUILD_MEM_GB = int(_KS_CONFIG.get("build_mem_gb", 128))
-KARYOSCOPE_BUILD_MEM_GIGAS = int(_KS_CONFIG.get("build_mem_gigas", 32))
-KARYOSCOPE_BUILD_EXTERNAL_MEMORY = str(_KS_CONFIG.get("build_external_memory", "") or "")
 KARYOSCOPE_KEEP_READ_ANNOTATIONS = bool(_KS_CONFIG.get("keep_read_annotations", True))
 KARYOSCOPE_REFERENCE_SAMPLES = karyoscope_list(_KS_CONFIG.get("reference_samples"))
 KARYOSCOPE_MALE_Y_PPM = float(_KS_CONFIG.get("male_y_ppm", 1000))
@@ -65,7 +61,9 @@ KARYOSCOPE_SOURCES = {
     # feature set (exon / intron / intergenic).
     "CHM13.gtf.gz": (
         "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/009/914/755/GCF_009914755.1_T2T-CHM13v2.0/GCF_009914755.1_T2T-CHM13v2.0_genomic.gtf.gz",  # noqa: E501
-        "fd8a27c06da23b4defc140d1bb03f5f0eb8b5ba780eeee6730617fe709c6a16e",
+        # NCBI updates this file in place; checksum of the version current in
+        # Nov 2026 (MD5 b8d2cf659c44bf3773e9dcaa875ac4a1 as in NCBI's md5checksums.txt)
+        "a72e1bc4a219b35cdde0f56c3a1333c4137e72e751390dfe30e2046ef115863e",
     ),
     # Cytogenetic bands of CHM13 from the T2T consortium (BED: chrom, start, end,
     # band name such as p36.33, Giemsa stain): the light/dark band pattern seen
@@ -237,9 +235,10 @@ if KARYOSCOPE_DB_STATE == "build":
             DIR_RSRC.joinpath("40-karyotyping", "10_karyoscope", "ks_db", f"{KARYOSCOPE_DB_ID}.build.rsrc")
         container:
             KARYOSCOPE_CONTAINER
-        threads: KARYOSCOPE_BUILD_THREADS
+        threads: 16
         resources:
-            mem_mb=lambda wildcards, attempt: (KARYOSCOPE_BUILD_MEM_GB * 1024) * attempt,
+            # ~80 GB peak at k=31 (KaryoScope's own CHM13 measurement)
+            mem_mb=lambda wildcards, attempt: (128 * 1024) * attempt,
             time_hrs=lambda wildcards, attempt: 4 * attempt
         params:
             script = get_script("karyoscope_build_db.sh", extension="sh"),
@@ -248,12 +247,12 @@ if KARYOSCOPE_DB_STATE == "build":
             db_root = KARYOSCOPE_DB_ROOT,
             db_id = KARYOSCOPE_DB_ID,
             bin_size_mb = KARYOSCOPE_BIN_SIZE_MB,
-            mem_gigas = KARYOSCOPE_BUILD_MEM_GIGAS,
-            external_memory = KARYOSCOPE_BUILD_EXTERNAL_MEMORY
+            # HKS memory budget (GB) during the build
+            mem_gigas = 32
         shell:
             "bash {params.script} '{params.sources_dir}' '{params.db_root}' '{params.db_id}'"
                 " {params.bin_size_mb} {threads} {params.mem_gigas} '{params.feature_beds}'"
-                " '{output.ready}' '{params.external_memory}' &> {log}"
+                " '{output.ready}' &> {log}"
 
 else:
 

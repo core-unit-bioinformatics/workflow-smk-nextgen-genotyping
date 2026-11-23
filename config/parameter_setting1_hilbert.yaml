@@ -66,8 +66,9 @@ assembly_aliases:
 # This can also be set via --config graph_type=... on the CLI instead
 graph_type: "vcf"
 
-# KaryoScope feature sets to annotate IN ADDITION to chromosome and gene.
-# Options: region, repeat, acrocentric, subtelomeric (comma-separated, empty = none)
+# KaryoScope feature sets to annotate IN ADDITION to the defaults
+# (chromosome, gene, cytoband, bins_1mb). Available in HKS_CHM13v2_karyo: region
+# (comma-separated, empty = none)
 # This can also be set via --config karyo-features=... on the CLI instead
 karyo-features: ""
 
@@ -75,13 +76,15 @@ karyo-features: ""
 karyoscope:
   # local .sif, or a registry URI Snakemake pulls itself (oras://..., server with internet)
   container: /gpfs/project/projects/medbioinf/projects/cubi/projects/nextgen-genotyping/workdirs/wd/input_data/karyoscope_2.3.0.sif
-  database: HKS_human_CHM13_v2
+  # database id in local_ref/karyoscope/; built by the workflow if not present
+  database: HKS_CHM13v2_karyo
   # checked when a hand-copied tarball is found in local_ref/karyoscope/
-  database_sha256: 4da29c348aaf4bc0808adb036c8557827bee798eb306cb0030f351d0a88b977b
-  # shown in the error message for a manual download
-  database_url: "https://zenodo.org/records/21150216/files/HKS_human_CHM13_v2.tar.gz?download=1"
+  database_sha256: ""
   # keep the large per-read BEDs after summarizing (false = temp())
   keep_read_annotations: true
+  # samples whose median is the baseline for all ratios (default: all samples);
+  # for tumour cohorts, list normal samples here
+  reference_samples: ""
   # sex call, part 1 - Y: chrY bp per million autosomal bp 
   # >= male_y_ppm: Y present; 
   # <= female_y_ppm: Y absent; in between: ambiguous
@@ -96,6 +99,8 @@ karyoscope:
   # chrY_copies column (the Y part of the sex call uses the ppm thresholds);
   # rough estimate - set it to chrY_ppm of the first confirmed XY sample
   y_haploid_ppm: 3500
+  # flag a ratio to the reference median that deviates by more than this
+  max_deviation: 0.2
 
 # Maximum total temp disk space (in MB) the workflow may use at once
 # for PanGenie/locityper temp() outputs. Defaults to 700000 (~700GB,
