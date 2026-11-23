@@ -1,3 +1,4 @@
+import json
 import pathlib
 import re
 
@@ -235,7 +236,7 @@ if KARYOSCOPE_DB_STATE == "build":
             DIR_RSRC.joinpath("40-karyotyping", "10_karyoscope", "ks_db", f"{KARYOSCOPE_DB_ID}.build.rsrc")
         container:
             KARYOSCOPE_CONTAINER
-        threads: 16
+        threads: CPU_HIGH
         resources:
             # ~80 GB peak at k=31 (KaryoScope's own CHM13 measurement)
             mem_mb=lambda wildcards, attempt: (128 * 1024) * attempt,
