@@ -21,18 +21,51 @@ KARYOSCOPE_DB_ID = str(_KS_CONFIG.get("database", "HKS_CHM13v2_karyo"))
 KARYOSCOPE_DB_SHA256 = str(_KS_CONFIG.get("database_sha256", "") or "")
 KARYOSCOPE_BIN_SIZE_MB = int(_KS_CONFIG.get("bin_size_mb", 1))
 KARYOSCOPE_KEEP_READ_ANNOTATIONS = bool(_KS_CONFIG.get("keep_read_annotations", True))
-KARYOSCOPE_REFERENCE_SAMPLES = karyoscope_list(_KS_CONFIG.get("reference_samples"))
-KARYOSCOPE_MALE_Y_PPM = float(_KS_CONFIG.get("male_y_ppm", 1000))
-KARYOSCOPE_FEMALE_Y_PPM = float(_KS_CONFIG.get("female_y_ppm", 500))
-KARYOSCOPE_X_DIPLOID_PPM = float(_KS_CONFIG.get("x_diploid_ppm", 53000))
-KARYOSCOPE_X_COPY_TOLERANCE = float(_KS_CONFIG.get("x_copy_tolerance", 0.25))
-KARYOSCOPE_Y_HAPLOID_PPM = float(_KS_CONFIG.get("y_haploid_ppm", 3500))
+# normal samples of this run to use as baseline (and to derive reference values
+# from): parameter file, or --config karyo-reference-samples=A,B,C
+KARYOSCOPE_REFERENCE_SAMPLES = karyoscope_list(
+    config.get("karyo-reference-samples") or _KS_CONFIG.get("reference_samples")
+)
 KARYOSCOPE_MAX_DEVIATION = float(_KS_CONFIG.get("max_deviation", 0.2))
 
 KARYOSCOPE_DB_ROOT = DIR_LOCAL_REF.joinpath("karyoscope")
 KARYOSCOPE_SOURCES_DIR = KARYOSCOPE_DB_ROOT.joinpath("sources")
 KARYOSCOPE_DB_READY = KARYOSCOPE_DB_ROOT.joinpath(f"{KARYOSCOPE_DB_ID}.ready")
 KARYOSCOPE_RESULTS_DIR = DIR_RES.joinpath("karyotyping", "karyoscope")
+
+# Reference values: the expected share of every label (chromosome, arm, band,
+# bin) in a normal genome; copies = expected copies x sample share / expected
+# share. Set via karyoscope.reference_values, default:
+# workflow/resources/karyoscope/reference_values.<database>.tsv
+#
+# The default file for HKS_CHM13v2_karyo is derived from 8 unrelated normal
+# genomes of the 1000 Genomes 30x WGS data (NYGC, Illumina NovaSeq 2x150, ENA
+# PRJEB31736/PRJEB36890), 20 M read pairs (~2x) each:
+#   NA12891 (M) / NA12892 (F)  CEU, Utah, European ancestry
+#   NA19239 (M) / NA19238 (F)  YRI, Yoruba, Nigeria
+#   HG00512 (M) / HG00513 (F)  CHS, Southern Han Chinese
+#   HG00731 (M) / HG00732 (F)  PUR, Puerto Rico
+# Autosomes come from all 8, chrX from the 4 females, chrY from the 4 males.
+# The file's header lines name the database and the samples it was made from.
+#
+# To create another reference set (e.g. after building a new database, or with
+# other samples):
+#   1. on a machine with internet, get the reads, e.g.
+#        bash workflow/scripts/karyoscope/fetch_reference_reads.sh OUTDIR \
+#            [READ_PAIRS] [SAMPLE ...]
+#      (writes the FASTQs and a sample sheet); include females and males
+#   2. run this workflow on them in its own working directory with
+#        --config tools=karyoscope karyo-reference-samples=<all their names>
+#   3. check SAMPLES.chromosome_dosage.tsv (sexes as expected, autosomes ~2)
+#   4. copy results/karyotyping/karyoscope/SAMPLES.reference_values.tsv to
+#        workflow/resources/karyoscope/reference_values.<database>.tsv
+# Details: docs/karyoscope/README_karyoscope.md, "Reference values".
+KARYOSCOPE_REFERENCE_VALUES = pathlib.Path(
+    _KS_CONFIG.get("reference_values")
+    or pathlib.Path(workflow.basedir).joinpath(
+        "resources", "karyoscope", f"reference_values.{KARYOSCOPE_DB_ID}.tsv"
+    )
+)
 
 # feature sets the summary needs for its dosage tables
 KARYOSCOPE_BINS_SET = f"bins_{KARYOSCOPE_BIN_SIZE_MB}mb"
@@ -157,8 +190,29 @@ if not KARYOSCOPE_BINS_SETS:
     logout("WARNING: no KaryoScope 'bins_*' set annotated: no bin dosage")
 
 
+# where the copy numbers' baseline comes from
+if KARYOSCOPE_REFERENCE_SAMPLES:
+    KARYOSCOPE_REFERENCE_VALUES_INPUT = []
+    logout(
+        "KaryoScope baseline: reference samples of this run "
+        f"({','.join(KARYOSCOPE_REFERENCE_SAMPLES)}); their reference values are "
+        "written to SAMPLES.reference_values.tsv"
+    )
+elif KARYOSCOPE_REFERENCE_VALUES.is_file():
+    KARYOSCOPE_REFERENCE_VALUES_INPUT = [KARYOSCOPE_REFERENCE_VALUES]
+    logout(f"KaryoScope baseline: reference values {KARYOSCOPE_REFERENCE_VALUES}")
+else:
+    KARYOSCOPE_REFERENCE_VALUES_INPUT = []
+    logout(
+        f"WARNING: no KaryoScope reference values ({KARYOSCOPE_REFERENCE_VALUES}) and "
+        "no reference_samples: copies are relative to the median of this run's samples"
+    )
+
+
 # cohort tables the summary writes for these feature sets
 KARYOSCOPE_COHORT_TABLES = [
+    KARYOSCOPE_RESULTS_DIR.joinpath("SAMPLES.reference_values.tsv")
+] + [
     KARYOSCOPE_RESULTS_DIR.joinpath(f"SAMPLES.{fs}.composition.tsv")
     for fs in KARYOSCOPE_FEATURE_SETS
     if fs != "cytoband" and not fs.startswith("bins_")
@@ -367,11 +421,13 @@ rule merge_karyoscope_cohort:
     Merge the per-sample tables into the cohort tables: one composition table
     per feature set (not for cytoband/bins), chromosome dosage and sex call
     (needs 'chromosome'), arm and band dosage (needs 'cytoband'), bin dosage
-    (needs a 'bins_*' set). Ratios are relative to the median of the reference
-    samples (karyoscope.reference_samples, default: all samples).
+    (needs a 'bins_*' set). Copies are relative to the expected share of a
+    normal genome: from karyoscope.reference_samples of this run if set, else
+    from the reference values file, else the median of all samples.
     """
     input:
-        tables = expand(rules.summarize_karyoscope_sample.output.table, sample=SAMPLES_KARYOSCOPE)
+        tables = expand(rules.summarize_karyoscope_sample.output.table, sample=SAMPLES_KARYOSCOPE),
+        reference_values = KARYOSCOPE_REFERENCE_VALUES_INPUT
     output:
         tables = KARYOSCOPE_COHORT_TABLES
     log:
@@ -386,22 +442,18 @@ rule merge_karyoscope_cohort:
         script = get_script("karyoscope_summarize.py"),
         outdir = KARYOSCOPE_RESULTS_DIR,
         feature_sets = ",".join(KARYOSCOPE_FEATURE_SETS),
+        database = KARYOSCOPE_DB_ID,
+        reference_values = lambda wildcards, input: (
+            f"--reference-values {input.reference_values}" if input.reference_values else ""
+        ),
         reference_samples = ",".join(KARYOSCOPE_REFERENCE_SAMPLES),
-        male_y_ppm = KARYOSCOPE_MALE_Y_PPM,
-        female_y_ppm = KARYOSCOPE_FEMALE_Y_PPM,
-        max_deviation = KARYOSCOPE_MAX_DEVIATION,
-        x_diploid_ppm = KARYOSCOPE_X_DIPLOID_PPM,
-        x_copy_tolerance = KARYOSCOPE_X_COPY_TOLERANCE,
-        y_haploid_ppm = KARYOSCOPE_Y_HAPLOID_PPM
+        max_deviation = KARYOSCOPE_MAX_DEVIATION
     shell:
         "python3 {params.script} cohort --inputs {input.tables}"
             " --feature-sets {params.feature_sets} --outdir {params.outdir}"
+            " --database {params.database} {params.reference_values}"
             " --reference-samples '{params.reference_samples}'"
-            " --male-y-ppm {params.male_y_ppm} --female-y-ppm {params.female_y_ppm}"
-            " --max-deviation {params.max_deviation}"
-            " --x-diploid-ppm {params.x_diploid_ppm}"
-            " --x-copy-tolerance {params.x_copy_tolerance}"
-            " --y-haploid-ppm {params.y_haploid_ppm} &> {log}"
+            " --max-deviation {params.max_deviation} &> {log}"
 
 
 rule run_all_karyoscope_annotation:

@@ -22,6 +22,8 @@ The database (`HKS_CHM13v2_karyo`) is built by the workflow itself, see [Databas
 | `karyoscope_fetch_source.sh` | `workflow/scripts/karyoscope/` (download one build source) |
 | `karyoscope_build_db.sh` | `workflow/scripts/karyoscope/` (build the database) |
 | `karyoscope_feature_beds.py` | `workflow/scripts/karyoscope/` (arm level for the cytobands, bins) |
+| `fetch_reference_reads.sh` | `workflow/scripts/karyoscope/` (not run by the workflow: download reference genomes' reads) |
+| `reference_values.HKS_CHM13v2_karyo.tsv` | `workflow/resources/karyoscope/` (made once, see [Reference values](#reference-values)) |
 | `README.md` | `docs/karyoscope/README.md` (this file) |
 
 KaryoScope is wired in through `15-init/05_tools.smk` (`RUN_KARYOSCOPE`), `00_modules.smk`
@@ -88,10 +90,11 @@ All in `results/karyotyping/karyoscope/`:
 
 | File | Content |
 |---|---|
-| `SAMPLES.chromosome_dosage.tsv` | per sample: dosage per autosome, X/Y ppm and copies, sex call, flags |
-| `SAMPLES.arm_dosage.tsv` | per sample: dosage per autosomal arm, X/Y arms as ppm, flags |
-| `SAMPLES.cytoband_dosage.tsv` | long format, per sample and band: bp, ppm, ratio, flag |
-| `SAMPLES.bins_1mb_dosage.tsv` | long format, per sample and bin: start, end, bp, ppm, ratio, flag |
+| `SAMPLES.chromosome_dosage.tsv` | per sample: copies per autosome, X and Y, sex call, flags |
+| `SAMPLES.arm_dosage.tsv` | per sample: copies per arm (incl. X and Y), flags |
+| `SAMPLES.cytoband_dosage.tsv` | long format, per sample and band: copies, flag |
+| `SAMPLES.bins_1mb_dosage.tsv` | long format, per sample and bin: start, end, copies, flag |
+| `SAMPLES.reference_values.tsv` | the expected values used as baseline in this run (see [Reference values](#reference-values)) |
 | `SAMPLES.<set>.composition.tsv` | per feature set (not cytoband/bins): sample × label, fraction of annotated bp |
 
 Per sample: `<proc>/40-karyotyping/10_karyoscope/ks_sum/<sample>.composition.tsv` (long
@@ -105,26 +108,34 @@ Labels are sorted by hierarchy (`chromosome`: `categorized`, `autosome`, `metace
 `intron`, `intergenic`) or genomically (bands from the p-arm telomere through the centromere
 to the q-arm telomere; bins by position). `novel` comes last.
 
-### How the dosage values work
+### How the copy numbers work
 
-- **ppm**: bp of the label per million autosomal bp *of the same feature set* (labels on
-  chr1–22, group labels within a chromosome included). This makes values independent of
-  sequencing depth and of the sample's sex.
-- **ratio**: the sample's ppm divided by the median ppm of the **reference samples**
-  (`karyoscope.reference_samples`, default: all samples of the run). ~1.0 = like the
-  reference, ~0.5 = one of two copies lost, ~1.5 = one copy gained. Only for autosomes.
-  X and Y differ between the sexes, so they're given as ppm only.
-- **flag / flags**: `loss` / `gain` (or `arm:ratio`) where the ratio deviates from 1 by
-  more than `max_deviation` (default 0.2).
+- **share**: bp of a label divided by the autosomal bp *of the same feature set* (labels
+  on chr1–22, group labels within a chromosome included). Independent of sequencing depth.
+- **copies** = expected copies × sample share / expected share. The expected share is what a
+  normal genome shows for that label: autosomes 2 copies, chrX 2 copies (taken from female
+  references), chrY 1 copy (from male references). So a female shows ~2 X copies and ~0 Y,
+  a male ~1 X and ~1 Y, a trisomy 21 ~3 copies of chr21.
+- **flag / flags**: `loss` / `gain` (or `5q:1.02`) where the copies deviate from the expected
+  copies by more than `max_deviation` (default 0.2, i.e. below 1.6 or above 2.4 for
+  autosomes). Only autosomes are flagged; X/Y are covered by the sex call.
 
-For tumour cohorts, set `reference_samples` to normal samples (e.g. matched normals). With
-the default, the median of the tumours themselves is the baseline, and an alteration shared
-by many of them (e.g. 1q gain) partly cancels out.
+Where the expected shares come from, in order of preference:
+
+1. `karyoscope.reference_samples` (or `--config karyo-reference-samples=A,B,C`): normal
+   samples in the same run, e.g. matched normals.
+2. The reference values file (`karyoscope.reference_values`, default
+   `workflow/resources/karyoscope/reference_values.<database>.tsv`), derived once from
+   public normal genomes, see [Reference values](#reference-values).
+3. Neither: the median of all samples of the run, with a warning. Then the copies only say
+   "relative to this cohort", and alterations shared by many samples partly cancel out.
 
 Limits: tumour purity and subclonality dilute the signal (50 % tumour cells and one lost
-arm give ~0.75); copy-neutral loss of heterozygosity is invisible (counts only, no alleles);
-there is no GC correction, so single bins are noisier than arms. Whole chromosomes and arms
-are robust; single bands and bins are best read as runs of neighbouring bins.
+arm give ~1.5 copies instead of 1); copy-neutral loss of heterozygosity is invisible (counts
+only, no alleles); there is no GC correction, so single bins are noisier than arms, and data
+from a different lab than the reference can shift single chromosomes slightly (e.g. 1.95 or
+2.05). Whole chromosomes and arms are robust; single bands and bins are best read as runs of
+neighbouring bins.
 
 **`SAMPLES.chromosome_dosage.tsv`**:
 
@@ -133,29 +144,102 @@ are robust; single bands and bins are best read as runs of neighbouring bins.
 | `total_bp` | annotated k-mer bp in the `chromosome` set, all labels |
 | `autosomal_bp`, `autosomal_fraction` | bp labelled `chr1`–`chr22` exactly (no group labels), and their share of `total_bp` |
 | `novel_fraction` | share of `novel`; high values point to contamination or poor quality |
-| `chr1` … `chr22` | ratio to the reference median |
-| `chrX_ppm`, `chrX_copies` | chrX bp per million `autosomal_bp`; `2 × chrX_ppm / x_diploid_ppm` (~2 for XX, ~1 for XY) |
-| `chrY_ppm`, `chrY_copies` | the same for chrY; `chrY_ppm / y_haploid_ppm`, display only until `y_haploid_ppm` is calibrated |
-| `sex_chromosomes` | from rounded `chrX_copies` and the Y ppm thresholds: `XX`, `XY`, `X0`, `XXY`, `XXX`, … or `ambiguous` |
+| `chr1_copies` … `chr22_copies` | copies per autosome |
+| `chrX_copies` | ~2 for XX, ~1 for XY |
+| `chrY_copies` | ~0 for XX, ~1 for XY |
+| `sex_chromosomes` | X copies rounded (at most 0.25 off a whole number), Y present from 0.5 copies, absent up to 0.1: `XX`, `XY`, `X0`, `XXY`, `XXX`, … or `ambiguous` (e.g. Y between 0.1 and 0.5: mosaic loss of Y) |
 | `inferred_sex` | `female` (XX), `male` (XY), `atypical`, `ambiguous` |
-| `flags` | autosomes with a ratio off by more than `max_deviation`, plus `sex:<call>(...)` for anything other than XX/XY |
+| `flags` | autosomes off by more than `max_deviation` (e.g. `chr8:2.91`), plus `sex:<call>(...)` for anything other than XX/XY |
 
-**`SAMPLES.arm_dosage.tsv`**: `autosomal_bp` of the cytoband set, one ratio column per
-autosomal arm (`1p` … `22q`), `Xp_ppm` … `Yq_ppm`, `flags` (e.g. `5q:0.51;17p:0.62`).
-An arm's value sums its bands, band groups and the arm label itself. The short arms of the
-acrocentric chromosomes (13p, 14p, 15p, 21p, 22p) are mostly rDNA and satellites, which vary
-a lot between people anyway.
+The sex call works on these copies. Without reference values (or with a reference lacking
+females or males), it falls back to rough built-in values for chrX and chrY; these also sort
+the reference samples into females and males when reference values are derived.
 
-**`SAMPLES.cytoband_dosage.tsv`**: `sample`, `chrom`, `arm`, `band`, `bp`, `ppm`, `ratio`,
-`flag`. Rows with a band-group label (`5q31`) hold k-mers that could only be placed to that
+**`SAMPLES.arm_dosage.tsv`**: one `<arm>_copies` column per arm (`1p_copies` …
+`Yq_copies`), `flags` (e.g. `5q:1.02;17p:1.24`). An arm's value sums its bands, band groups
+and the arm label itself. The short arms of the acrocentric chromosomes (13p, 14p, 15p, 21p,
+22p) are mostly rDNA and satellites, which vary a lot between people anyway.
+
+**`SAMPLES.cytoband_dosage.tsv`**: `sample`, `chrom`, `arm`, `band`, `copies`, `flag`. Rows with a band-group label (`5q31`) hold k-mers that could only be placed to that
 group.
 
-**`SAMPLES.bins_1mb_dosage.tsv`**: `sample`, `chrom`, `start`, `end`, `bp`, `ppm`, `ratio`,
-`flag`. The last bin of each chromosome is shorter.
+**`SAMPLES.bins_1mb_dosage.tsv`**: `sample`, `chrom`, `start`, `end`, `copies`, `flag`. The last bin of each chromosome is shorter.
 
 Arm, band and bin tables answer different questions: the arm table gives the overview, the
 band table names the affected region in cytogenetic terms (e.g. 5q31–q33), the bin table
 shows where within an arm the change starts and ends.
+
+## Reference values
+
+The expected share of every label (chromosome, arm, band, bin) can't be computed from the
+reference sequence alone: how many of a region's k-mers end up with exactly that label
+depends on its repeats, duplications and on how real reads behave. So it's measured once on
+real sequencing data of normal genomes, and stored as
+`workflow/resources/karyoscope/reference_values.<database>.tsv`. Every later run uses it,
+so copies don't depend on what else is in the run.
+
+The file is tied to the database (`# database:` line). After building a new database (e.g.
+another bin size), derive it again.
+
+### Deriving them (once per database)
+
+Reference genomes: 8 unrelated individuals from the 1000 Genomes 30x data (NYGC, Illumina
+NovaSeq 2×150), 4 female and 4 male, 4 populations:
+
+| Sample | Sex | Population |
+|---|---|---|
+| NA12891 / NA12892 | M / F | CEU (Utah, European ancestry) |
+| NA19239 / NA19238 | M / F | YRI (Yoruba, Nigeria) |
+| HG00512 / HG00513 | M / F | CHS (Southern Han Chinese) |
+| HG00731 / HG00732 | M / F | PUR (Puerto Rico) |
+
+Several individuals from several populations average out individual variation; both sexes
+are needed for the X and Y values.
+
+**1. On a machine with internet**, stream 20 million read pairs (~2× coverage, like the
+downsampled data) per sample from ENA:
+
+```bash
+bash workflow/scripts/karyoscope/fetch_reference_reads.sh karyoscope_reference_reads
+# optional: read pairs and own sample list
+# bash .../fetch_reference_reads.sh OUTDIR 20000000 NA12891 NA12892 ...
+```
+
+This writes `<sample>_R1.fq.gz` / `_R2.fq.gz` (~1.5 GB each) and
+`sample_sheet_reference.tsv`. Only the first 20 M read pairs are downloaded (FASTQ order
+follows the flowcell, not the genome, so this is a random subsample).
+
+**2. Copy them to the server** and replace the local folder in the sample sheet's paths
+with the folder on the server:
+
+```bash
+rsync -P karyoscope_reference_reads/ <server>:/path/to/karyoscope_reference_reads/
+# on the server:
+sed -i 's|<local folder printed by the script>|/path/to/karyoscope_reference_reads|g' \
+    /path/to/karyoscope_reference_reads/sample_sheet_reference.tsv
+```
+
+**3. Run the workflow** with these samples as reference samples, in its own working
+directory:
+
+```bash
+snakemake -d <reference_wd> ... --config samples=/path/to/karyoscope_reference_reads/sample_sheet_reference.tsv \
+    tools=karyoscope \
+    karyo-reference-samples=NA12891,NA12892,NA19239,NA19238,HG00512,HG00513,HG00731,HG00732 \
+    ... "$BIND"
+```
+
+**4. Check** `results/karyotyping/karyoscope/SAMPLES.chromosome_dosage.tsv`: 4 × `XX`,
+4 × `XY`, all autosomes ~2.0 copies (they're compared with their own median, so this mainly
+catches an outlier sample). Then copy the reference values into the repo and commit them:
+
+```bash
+cp <reference_wd>/results/karyotyping/karyoscope/SAMPLES.reference_values.tsv \
+   workflow/resources/karyoscope/reference_values.HKS_CHM13v2_karyo.tsv
+```
+
+From then on every run without `reference_samples` uses this file; the log says
+`KaryoScope baseline: reference values ...`.
 
 ## Database
 
@@ -271,23 +355,15 @@ karyoscope:
   bin_size_mb: 1
   # keep the large per-read BEDs after summarizing (false = temp())
   keep_read_annotations: true
-  # samples whose median is the baseline for all ratios (default: all samples);
-  # for tumour cohorts, list normal samples here
+  # baseline for the copy numbers: normal samples of this run (e.g. matched
+  # normals); also --config karyo-reference-samples=A,B. Empty: use the
+  # reference values file below
   reference_samples: ""
-  # sex call, part 1 - Y: chrY bp per million autosomal bp
-  # >= male_y_ppm: Y present; <= female_y_ppm: Y absent; in between: ambiguous
-  male_y_ppm: 1000
-  female_y_ppm: 500
-  # sex call, part 2 - X: expected chrX ppm of autosomal bp for TWO X copies
-  # (chrX_copies = 2 * chrX_ppm / x_diploid_ppm); a copy estimate further
-  # than x_copy_tolerance from a whole number is called ambiguous
-  x_diploid_ppm: 53000
-  x_copy_tolerance: 0.25
-  # expected chrY ppm of autosomal bp for ONE Y copy, only used for the
-  # chrY_copies column (the Y part of the sex call uses the ppm thresholds);
-  # rough estimate - set it to chrY_ppm of the first confirmed XY sample
-  y_haploid_ppm: 3500
-  # flag a ratio to the reference median that deviates by more than this
+  # expected values of normal genomes (see "Reference values"); default:
+  # workflow/resources/karyoscope/reference_values.<database>.tsv
+  # reference_values: /path/to/reference_values.tsv
+  # flag copies that deviate from the expected copies by more than this
+  # fraction (0.2: autosomes below 1.6 or above 2.4)
   max_deviation: 0.2
 ```
 
@@ -321,13 +397,12 @@ real (downsampled) data has run.
 
 ## Checks after the first cohort
 
-- `inferred_sex` against the sample metadata (also a sample-swap test). If samples end up
-  `ambiguous`: plot `chrY_ppm` (log scale) and set `male_y_ppm` / `female_y_ppm` between the
-  two clusters; check that `chrX_copies` clusters around 1 and 2, otherwise set
-  `x_diploid_ppm` to the median `chrX_ppm` of the confirmed females. Set `y_haploid_ppm` to
-  the median `chrY_ppm` of the confirmed males.
-- Autosome and arm ratios of normal samples should sit within ~±0.05 of 1. If they're
-  noisier, the downsampling is too strong.
+- `inferred_sex` against the sample metadata (also a sample-swap test). `ambiguous` with
+  `chrY_copies` between 0.1 and 0.5 is usually mosaic loss of Y (common in older men).
+- Autosome and arm copies of normal samples should sit within ~±0.1 of 2. If they're
+  noisier, the downsampling is too strong; if single chromosomes are shifted in all samples,
+  the lab differs a lot from the reference data (use normal samples of the run as
+  `reference_samples`).
 - `novel_fraction` outliers: contamination or low quality.
 
 ## Moving to another server

@@ -5,11 +5,17 @@ Subcommands:
   sample  sum the annotated k-mer bp per label and feature set for one sample
   cohort  merge the per-sample tables into cohort tables:
             SAMPLES.<set>.composition.tsv   per set, fraction per label
-            SAMPLES.chromosome_dosage.tsv   needs 'chromosome': dosage, sex call
-            SAMPLES.arm_dosage.tsv          needs 'cytoband': dosage per arm
-            SAMPLES.cytoband_dosage.tsv     needs 'cytoband': dosage per band
-            SAMPLES.<bins>_dosage.tsv       needs a 'bins_*' set: dosage per bin
+            SAMPLES.reference_values.tsv    expected share per label (the baseline)
+            SAMPLES.chromosome_dosage.tsv   needs 'chromosome': copies, sex call
+            SAMPLES.arm_dosage.tsv          needs 'cytoband': copies per arm
+            SAMPLES.cytoband_dosage.tsv     needs 'cytoband': copies per band
+            SAMPLES.<bins>_dosage.tsv       needs a 'bins_*' set: copies per bin
           Tables whose feature set was not annotated are skipped with a warning.
+
+Copies = expected copies x (sample share / expected share), where a share is the
+label's bp divided by the autosomal bp of the same feature set, and the expected
+share comes from normal reference genomes (reference values file, or reference
+samples of the run): autosomes 2 copies, chrX 2 (from females), chrY 1 (males).
 """
 
 import argparse
@@ -30,6 +36,22 @@ NOVEL = "novel"
 CHROMOSOME_SET = "chromosome"
 CYTOBAND_SET = "cytoband"
 BINS_PREFIX = "bins_"
+ARM_TABLE = "arm"
+
+# Sex call. With reference values: X copies rounded to a whole number (at most
+# X_COPY_TOLERANCE off), Y present from Y_PRESENT_COPIES, absent up to
+# Y_ABSENT_COPIES, in between ambiguous (e.g. mosaic loss of Y).
+X_COPY_TOLERANCE = 0.25
+Y_PRESENT_COPIES = 0.5
+Y_ABSENT_COPIES = 0.1
+# Rough values (ppm of autosomal bp, chromosome set of HKS_CHM13v2_karyo) for a
+# first sex call before reference values exist: only used to sort reference
+# samples into females (chrX values) and males (chrY values), and as fallback
+# when the reference has no female or no male.
+BOOTSTRAP_X_DIPLOID_PPM = 53000.0
+BOOTSTRAP_Y_PRESENT_PPM = 1000.0
+BOOTSTRAP_Y_ABSENT_PPM = 500.0
+ARMS = [f"{c.removeprefix('chr')}{arm}" for c in CHROMOSOMES for arm in "pq"]
 
 # cytoband labels: chromosome node "1", arm node "1p", band group "1p36",
 # band "1p36.33" (chromosome without the "chr" prefix)
@@ -68,46 +90,24 @@ def parse_args():
     coh.add_argument("--inputs", required=True, nargs="+", type=pathlib.Path)
     coh.add_argument("--feature-sets", required=True, help="comma-separated")
     coh.add_argument("--outdir", required=True, type=pathlib.Path)
+    coh.add_argument("--database", required=True, help="KaryoScope database id")
+    coh.add_argument(
+        "--reference-values",
+        type=pathlib.Path,
+        help="reference values file (SAMPLES.reference_values.tsv of a reference run)",
+    )
     coh.add_argument(
         "--reference-samples",
         default="",
-        help="comma-separated samples whose median is the baseline (default: all)",
-    )
-    coh.add_argument(
-        "--male-y-ppm",
-        type=float,
-        default=1000.0,
-        help="chrY ppm of autosomal bp at or above which Y counts as present",
-    )
-    coh.add_argument(
-        "--female-y-ppm",
-        type=float,
-        default=500.0,
-        help="chrY ppm of autosomal bp at or below which Y counts as absent",
-    )
-    coh.add_argument(
-        "--x-diploid-ppm",
-        type=float,
-        default=53000.0,
-        help="expected chrX ppm of autosomal bp for two X copies",
-    )
-    coh.add_argument(
-        "--y-haploid-ppm",
-        type=float,
-        default=3500.0,
-        help="expected chrY ppm of autosomal bp for ONE Y copy (display only)",
-    )
-    coh.add_argument(
-        "--x-copy-tolerance",
-        type=float,
-        default=0.25,
-        help="max distance of the X copy estimate from a whole number",
+        help="comma-separated normal samples of this run to use as reference "
+        "(overrides --reference-values)",
     )
     coh.add_argument(
         "--max-deviation",
         type=float,
         default=0.2,
-        help="flag a ratio to the reference median that deviates more than this",
+        help="flag copies that deviate from the expected copies by more than this "
+        "fraction",
     )
     return parser.parse_args()
 
@@ -253,11 +253,7 @@ def write_tsv(path, header, rows):
         writer.writerows(rows)
 
 
-def ratio(value, reference):
-    """Return value / reference, or None if the reference is missing or zero."""
-    if reference is None or reference == 0:
-        return None
-    return value / reference
+# reference values: the expected share of every label for a normal genome
 
 
 def fmt(value, digits=4):
@@ -265,20 +261,336 @@ def fmt(value, digits=4):
     return "NA" if value is None else f"{value:.{digits}f}"
 
 
-def flag(value, max_deviation):
-    """Return 'gain', 'loss' or '.' for a ratio to the reference median."""
-    if value is None or abs(value - 1) <= max_deviation:
-        return "."
-    return "gain" if value > 1 else "loss"
+def label_chrom(table, label):
+    """Chromosome (chr1 ... chrY) of a label in one of the dosage tables, or None."""
+    if table == CHROMOSOME_SET:
+        return label if label in CHROMOSOMES else None
+    if table in (ARM_TABLE, CYTOBAND_SET):
+        parsed = parse_cytoband(label)
+        return parsed[0] if parsed else None
+    if is_bins_set(table):
+        parsed = parse_bin(label)
+        return parsed[0] if parsed else None
+    return None
 
 
-def reference_medians(shares, reference):
-    """Median per key over the reference samples ({sample: {key: share}})."""
-    keys = {key for per_sample in shares.values() for key in per_sample}
-    return {
-        key: statistics.median(shares[s].get(key, 0.0) for s in reference)
-        for key in keys
+def sample_shares(per_set, feature_sets):
+    """Return {table: {label: share of the set's autosomal bp}} for one sample."""
+    shares = {}
+    if CHROMOSOME_SET in feature_sets:
+        counts = per_set.get(CHROMOSOME_SET, {})
+        autosomal = sum(counts.get(c, 0) for c in AUTOSOMES)
+        if autosomal:
+            shares[CHROMOSOME_SET] = {
+                c: counts.get(c, 0) / autosomal for c in CHROMOSOMES
+            }
+    if CYTOBAND_SET in feature_sets:
+        counts = per_set.get(CYTOBAND_SET, {})
+        bands, arms = {}, collections.Counter()
+        autosomal = 0
+        for label, bp in counts.items():
+            parsed = parse_cytoband(label)
+            if parsed is None:
+                continue
+            chrom, arm, band = parsed
+            if chrom in AUTOSOMES:
+                autosomal += bp
+            if arm:
+                arms[f"{chrom.removeprefix('chr')}{arm}"] += bp
+            if band:
+                bands[label] = bp
+        if autosomal:
+            shares[ARM_TABLE] = {a: arms.get(a, 0) / autosomal for a in ARMS}
+            shares[CYTOBAND_SET] = {b: bp / autosomal for b, bp in bands.items()}
+    for feature_set in feature_sets:
+        if not is_bins_set(feature_set):
+            continue
+        counts = per_set.get(feature_set, {})
+        # bins plus the chromosome nodes (k-mers shared between bins of one
+        # chromosome) of the autosomes
+        autosomal = sum(bp for lb, bp in counts.items() if bins_chrom(lb) in AUTOSOMES)
+        if autosomal:
+            shares[feature_set] = {
+                lb: bp / autosomal for lb, bp in counts.items() if parse_bin(lb)
+            }
+    return shares
+
+
+def expectations_from_samples(shares, sexes, reference):
+    """Compute the expected share per table and label from normal samples.
+
+    Autosomes from all of them (2 copies), chrX from the females (2 copies),
+    chrY from the males (1 copy).
+    """
+    groups = {
+        "autosome": reference,
+        CHR_X: [s for s in reference if sexes.get(s) == "female"],
+        CHR_Y: [s for s in reference if sexes.get(s) == "male"],
     }
+    for name, label in ((CHR_X, "female"), (CHR_Y, "male")):
+        if not groups[name]:
+            warn(f"no {label} reference sample: no expected values for {name}")
+    expected = {}
+    tables = {table for s in reference for table in shares[s]}
+    for table in tables:
+        labels = {lb for s in reference for lb in shares[s].get(table, {})}
+        for label in labels:
+            chrom = label_chrom(table, label)
+            if chrom is None:
+                continue
+            group = chrom if chrom in (CHR_X, CHR_Y) else "autosome"
+            if not groups[group]:
+                continue
+            values = [shares[s].get(table, {}).get(label, 0.0) for s in groups[group]]
+            expected.setdefault(table, {})[label] = (
+                statistics.median(values),
+                1 if chrom == CHR_Y else 2,
+                len(values),
+            )
+    return expected
+
+
+def read_expectations(path, database):
+    """Read a reference values file; None if it belongs to another database."""
+    expected = {}
+    file_database = None
+    with open(path, encoding="utf-8", newline="") as handle:
+        lines = []
+        for line in handle:
+            if line.startswith("# database:"):
+                file_database = line.split(":", 1)[1].strip()
+            elif not line.startswith("#"):
+                lines.append(line)
+    if file_database != database:
+        warn(
+            f"{path} is for database {file_database!r}, not {database!r}: "
+            "ignored, using the samples of this run as reference"
+        )
+        return None
+    for row in csv.DictReader(lines, delimiter="\t"):
+        expected.setdefault(row["table"], {})[row["label"]] = (
+            float(row["expected_ppm"]) / 1e6,
+            int(row["expected_copies"]),
+            int(row["n_samples"]),
+        )
+    return expected
+
+
+def write_expectations(path, expected, database, source):
+    """Write the reference values used in this run (reusable as default file)."""
+    rows = []
+    for table in sorted(expected):
+        for label in sorted(expected[table], key=lambda lb: table_sort_key(table, lb)):
+            share, copies, n_samples = expected[table][label]
+            chrom = label_chrom(table, label)
+            rows.append([table, label, chrom, f"{share * 1e6:.3f}", copies, n_samples])
+    with open(path, "w", encoding="utf-8", newline="") as handle:
+        handle.write(f"# database: {database}\n")
+        handle.write(f"# source: {source}\n")
+        writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
+        writer.writerow(
+            ["table", "label", "chrom", "expected_ppm", "expected_copies", "n_samples"]
+        )
+        writer.writerows(rows)
+
+
+def table_sort_key(table, label):
+    """Genomic sort key for a label of any dosage table."""
+    if table == CYTOBAND_SET:
+        return cytoband_key(label)
+    if is_bins_set(table):
+        return bin_key(label)
+    if table == ARM_TABLE:
+        return (ARMS.index(label), 0)
+    return (CHROMOSOMES.index(label), 0)
+
+
+def copies(share, expected):
+    """Copy number from a share and its (expected share, expected copies)."""
+    if expected is None or expected[0] == 0:
+        return None
+    return expected[1] * share / expected[0]
+
+
+def flag(value, expected_copies, max_deviation):
+    """Return 'gain', 'loss' or '.' relative to the expected copy number."""
+    if value is None or abs(value / expected_copies - 1) <= max_deviation:
+        return "."
+    return "gain" if value > expected_copies else "loss"
+
+
+# sex call (chromosome set)
+
+
+def call_sex_chromosomes(x_copies, y_status):
+    """Return (sex_chromosomes, inferred_sex) from X copies and the Y status."""
+    x_count = round(x_copies)
+    if x_count < 1 or abs(x_copies - x_count) > X_COPY_TOLERANCE:
+        x_count = None
+    if x_count is None or y_status == "ambiguous":
+        return "ambiguous", "ambiguous"
+    sex_chromosomes = "X" * x_count + ("Y" if y_status == "present" else "")
+    if sex_chromosomes == "X":
+        sex_chromosomes = "X0"
+    inferred_sex = {"XX": "female", "XY": "male"}.get(sex_chromosomes, "atypical")
+    return sex_chromosomes, inferred_sex
+
+
+def y_status_from(value, present, absent):
+    """Return 'present', 'absent' or 'ambiguous' for a Y value and two thresholds."""
+    if value >= present:
+        return "present"
+    if value <= absent:
+        return "absent"
+    return "ambiguous"
+
+
+def bootstrap_sexes(shares):
+    """Rough sex per sample from fixed ppm values (to pick X/Y reference samples)."""
+    sexes = {}
+    for sample, per_table in shares.items():
+        share = per_table.get(CHROMOSOME_SET)
+        if share is None:
+            continue
+        x_copies = 2 * share[CHR_X] * 1e6 / BOOTSTRAP_X_DIPLOID_PPM
+        y_status = y_status_from(
+            share[CHR_Y] * 1e6, BOOTSTRAP_Y_PRESENT_PPM, BOOTSTRAP_Y_ABSENT_PPM
+        )
+        sexes[sample] = call_sex_chromosomes(x_copies, y_status)[1]
+    return sexes
+
+
+def sex_calls(shares, expected):
+    """Return {sample: X/Y copies and sex call}, from the reference values."""
+    exp = expected.get(CHROMOSOME_SET, {})
+    calls = {}
+    for sample, per_table in shares.items():
+        share = per_table.get(CHROMOSOME_SET)
+        if share is None:
+            continue
+        x_copies = copies(share[CHR_X], exp.get(CHR_X))
+        if x_copies is None:
+            x_copies = 2 * share[CHR_X] * 1e6 / BOOTSTRAP_X_DIPLOID_PPM
+        y_copies = copies(share[CHR_Y], exp.get(CHR_Y))
+        if y_copies is None:
+            y_status = y_status_from(
+                share[CHR_Y] * 1e6, BOOTSTRAP_Y_PRESENT_PPM, BOOTSTRAP_Y_ABSENT_PPM
+            )
+        else:
+            y_status = y_status_from(y_copies, Y_PRESENT_COPIES, Y_ABSENT_COPIES)
+        sex_chromosomes, inferred_sex = call_sex_chromosomes(x_copies, y_status)
+        calls[sample] = {
+            "x_copies": x_copies,
+            "y_copies": y_copies,
+            "y_status": y_status,
+            "sex_chromosomes": sex_chromosomes,
+            "inferred_sex": inferred_sex,
+        }
+    return calls
+
+
+# dosage tables
+
+
+def write_chromosome_dosage(data, calls, shares, expected, args, path):
+    """Write per-sample copies per chromosome, sex call and flags."""
+    exp = expected.get(CHROMOSOME_SET, {})
+    header = [
+        "sample", "total_bp", "autosomal_bp", "autosomal_fraction", "novel_fraction",
+        *(f"{c}_copies" for c in AUTOSOMES), "chrX_copies", "chrY_copies",
+        "sex_chromosomes", "inferred_sex", "flags",
+    ]  # fmt: skip
+    rows = []
+    for sample in sorted(calls):
+        counts = data[sample].get(CHROMOSOME_SET, {})
+        total = sum(counts.values())
+        autosomal = sum(counts.get(c, 0) for c in AUTOSOMES)
+        share = shares[sample][CHROMOSOME_SET]
+        m = calls[sample]
+        auto = {c: copies(share[c], exp.get(c)) for c in AUTOSOMES}
+        flags = [
+            f"{c}:{v:.2f}"
+            for c, v in auto.items()
+            if flag(v, 2, args.max_deviation) != "."
+        ]
+        if m["sex_chromosomes"] not in ("XX", "XY"):
+            flags.append(
+                f"sex:{m['sex_chromosomes']}(chrX_copies={fmt(m['x_copies'], 2)},"
+                f"chrY_copies={fmt(m['y_copies'], 2)},y={m['y_status']})"
+            )
+        rows.append([
+            sample, total, autosomal, fmt(autosomal / total, 6),
+            fmt(counts.get(NOVEL, 0) / total, 6),
+            *(fmt(auto[c], 2) for c in AUTOSOMES),
+            fmt(m["x_copies"], 2), fmt(m["y_copies"], 2),
+            m["sex_chromosomes"], m["inferred_sex"], ";".join(flags) if flags else ".",
+        ])  # fmt: skip
+    write_tsv(path, header, rows)
+
+
+def write_arm_dosage(shares, expected, args, path):
+    """Write per-sample copies per arm (X/Y relative to the expected sex) and flags."""
+    exp = expected.get(ARM_TABLE, {})
+    header = ["sample", *(f"{a}_copies" for a in ARMS), "flags"]
+    rows = []
+    for sample in sorted(shares):
+        share = shares[sample].get(ARM_TABLE, {})
+        values = {a: copies(share.get(a, 0.0), exp.get(a)) for a in ARMS}
+        flags = [
+            f"{a}:{values[a]:.2f}"
+            for a in ARMS
+            if not a.startswith(("X", "Y"))
+            and flag(values[a], 2, args.max_deviation) != "."
+        ]
+        rows.append([
+            sample,
+            *(fmt(values[a], 2) for a in ARMS),
+            ";".join(flags) if flags else ".",
+        ])  # fmt: skip
+    write_tsv(path, header, rows)
+
+
+def write_cytoband_dosage(shares, expected, args, path):
+    """Write a long table: one row per sample and band, with copies and flag."""
+    exp = expected.get(CYTOBAND_SET, {})
+    labels = sorted(
+        {lb for s in shares.values() for lb in s.get(CYTOBAND_SET, {})} | set(exp),
+        key=cytoband_key,
+    )
+    rows = []
+    for sample in sorted(shares):
+        share = shares[sample].get(CYTOBAND_SET, {})
+        for label in labels:
+            chrom, arm, _band = parse_cytoband(label)
+            value = copies(share.get(label, 0.0), exp.get(label))
+            mark = flag(value, 2, args.max_deviation) if chrom in AUTOSOMES else "."
+            rows.append([
+                sample, chrom, f"{chrom.removeprefix('chr')}{arm}", label,
+                fmt(value, 2), mark,
+            ])  # fmt: skip
+    header = ["sample", "chrom", "arm", "band", "copies", "flag"]
+    write_tsv(path, header, rows)
+
+
+def write_bins_dosage(shares, expected, feature_set, args, path):
+    """Write a long table: one row per sample and bin, with copies and flag."""
+    exp = expected.get(feature_set, {})
+    labels = sorted(
+        {lb for s in shares.values() for lb in s.get(feature_set, {})} | set(exp),
+        key=bin_key,
+    )
+    rows = []
+    for sample in sorted(shares):
+        share = shares[sample].get(feature_set, {})
+        for label in labels:
+            chrom, start, end = parse_bin(label)
+            value = copies(share.get(label, 0.0), exp.get(label))
+            mark = flag(value, 2, args.max_deviation) if chrom in AUTOSOMES else "."
+            rows.append([
+                sample, chrom, start, end, fmt(value, 2), mark,
+            ])  # fmt: skip
+    header = ["sample", "chrom", "start", "end", "copies", "flag"]
+    write_tsv(path, header, rows)
 
 
 def write_composition(data, feature_set, path):
@@ -297,233 +609,53 @@ def write_composition(data, feature_set, path):
     write_tsv(path, ["sample", "total_bp", *labels], rows)
 
 
-def call_sex_chromosomes(x_copies, y_ppm, args):
-    """Return (y_status, sex_chromosomes, inferred_sex) from X dosage and Y signal."""
-    if y_ppm >= args.male_y_ppm:
-        y_status = "present"
-    elif y_ppm <= args.female_y_ppm:
-        y_status = "absent"
-    else:
-        y_status = "ambiguous"
-
-    x_count = round(x_copies)
-    if x_count < 1 or abs(x_copies - x_count) > args.x_copy_tolerance:
-        x_count = None
-
-    if x_count is None or y_status == "ambiguous":
-        return y_status, "ambiguous", "ambiguous"
-    sex_chromosomes = "X" * x_count + ("Y" if y_status == "present" else "")
-    if sex_chromosomes == "X":
-        sex_chromosomes = "X0"
-    inferred_sex = {"XX": "female", "XY": "male"}.get(sex_chromosomes, "atypical")
-    return y_status, sex_chromosomes, inferred_sex
-
-
-def write_chromosome_dosage(data, reference, args, path):
-    """Write per-sample chromosome dosage, X/Y ppm and copies, sex call, flags."""
-    metrics = {}
-    for sample, per_set in data.items():
-        counts = per_set.get(CHROMOSOME_SET, {})
-        autosomal = sum(counts.get(c, 0) for c in AUTOSOMES)
-        if autosomal == 0:
-            raise ValueError(f"{sample}: no autosomal k-mers in the chromosome set")
-        total = sum(counts.values())
-        x_ppm = counts.get(CHR_X, 0) / autosomal * 1e6
-        y_ppm = counts.get(CHR_Y, 0) / autosomal * 1e6
-        x_copies = 2 * x_ppm / args.x_diploid_ppm
-        y_copies = y_ppm / args.y_haploid_ppm
-        y_status, sex_chromosomes, inferred_sex = call_sex_chromosomes(
-            x_copies, y_ppm, args
-        )
-        metrics[sample] = {
-            "total": total,
-            "autosomal": autosomal,
-            "novel": counts.get(NOVEL, 0) / total,
-            "share": {c: counts.get(c, 0) / autosomal for c in AUTOSOMES},
-            "x_ppm": x_ppm,
-            "y_ppm": y_ppm,
-            "x_copies": x_copies,
-            "y_copies": y_copies,
-            "y_status": y_status,
-            "sex_chromosomes": sex_chromosomes,
-            "inferred_sex": inferred_sex,
-        }
-
-    median_share = reference_medians(
-        {s: m["share"] for s, m in metrics.items()}, reference
-    )
-    header = [
-        "sample", "total_bp", "autosomal_bp", "autosomal_fraction", "novel_fraction",
-        *AUTOSOMES,
-        "chrX_ppm", "chrX_copies",
-        "chrY_ppm", "chrY_copies",
-        "sex_chromosomes", "inferred_sex", "flags",
-    ]  # fmt: skip
-    rows = []
-    for sample in sorted(metrics):
-        m = metrics[sample]
-        ratios = {c: ratio(m["share"][c], median_share[c]) for c in AUTOSOMES}
-        flags = [
-            f"{c}:{r:.2f}"
-            for c, r in ratios.items()
-            if r is not None and abs(r - 1) > args.max_deviation
-        ]
-        if m["sex_chromosomes"] not in ("XX", "XY"):
-            flags.append(
-                f"sex:{m['sex_chromosomes']}"
-                f"(chrX_copies={m['x_copies']:.2f},chrY_copies={m['y_copies']:.2f},"
-                f"y={m['y_status']})"
-            )
-        rows.append([
-            sample, m["total"], m["autosomal"], fmt(m["autosomal"] / m["total"], 6),
-            fmt(m["novel"], 6),
-            *(fmt(ratios[c]) for c in AUTOSOMES),
-            fmt(m["x_ppm"], 1), fmt(m["x_copies"], 2),
-            fmt(m["y_ppm"], 1), fmt(m["y_copies"], 2),
-            m["sex_chromosomes"],
-            m["inferred_sex"], ";".join(flags) if flags else ".",
-        ])  # fmt: skip
-    write_tsv(path, header, rows)
-
-
-def cytoband_shares(data):
-    """Return per-sample band and arm bp, autosomal bp, and shares of it."""
-    result = {}
-    for sample, per_set in data.items():
-        counts = per_set.get(CYTOBAND_SET, {})
-        bands, arms = {}, collections.Counter()
-        autosomal = 0
-        for label, bp in counts.items():
-            parsed = parse_cytoband(label)
-            if parsed is None:
-                continue
-            chrom, arm, band = parsed
-            if chrom in AUTOSOMES:
-                autosomal += bp
-            if arm:
-                arms[f"{chrom.removeprefix('chr')}{arm}"] += bp
-            if band:
-                bands[label] = bp
-        if autosomal == 0:
-            raise ValueError(f"{sample}: no autosomal k-mers in the cytoband set")
-        result[sample] = {"bands": bands, "arms": arms, "autosomal": autosomal}
-    return result
-
-
-def arm_names():
-    """All arms in genomic order: 1p, 1q, ..., Xp, Xq, Yp, Yq."""
-    return [f"{c.removeprefix('chr')}{arm}" for c in CHROMOSOMES for arm in "pq"]
-
-
-def write_arm_dosage(cyto, reference, args, path):
-    """Write per-sample dosage per autosomal arm, X/Y arms as ppm, and flags."""
-    arms = arm_names()
-    autosomal_arms = [a for a in arms if not a.startswith(("X", "Y"))]
-    sex_arms = [a for a in arms if a.startswith(("X", "Y"))]
-    shares = {
-        s: {a: c["arms"].get(a, 0) / c["autosomal"] for a in arms}
-        for s, c in cyto.items()
-    }
-    median = reference_medians(shares, reference)
-    header = [
-        "sample", "autosomal_bp", *autosomal_arms,
-        *(f"{a}_ppm" for a in sex_arms), "flags",
-    ]  # fmt: skip
-    rows = []
-    for sample in sorted(cyto):
-        ratios = {a: ratio(shares[sample][a], median[a]) for a in autosomal_arms}
-        flags = [
-            f"{a}:{r:.2f}"
-            for a, r in ratios.items()
-            if r is not None and abs(r - 1) > args.max_deviation
-        ]
-        rows.append([
-            sample, cyto[sample]["autosomal"],
-            *(fmt(ratios[a]) for a in autosomal_arms),
-            *(fmt(shares[sample][a] * 1e6, 1) for a in sex_arms),
-            ";".join(flags) if flags else ".",
-        ])  # fmt: skip
-    write_tsv(path, header, rows)
-
-
-def write_cytoband_dosage(cyto, reference, args, path):
-    """Write a long table: one row per sample and band, with ppm, ratio, flag."""
-    shares = {
-        s: {b: bp / c["autosomal"] for b, bp in c["bands"].items()}
-        for s, c in cyto.items()
-    }
-    median = reference_medians(shares, reference)
-    labels = sorted(median, key=cytoband_key)
-    rows = []
-    for sample in sorted(cyto):
-        for label in labels:
-            chrom, arm, band = parse_cytoband(label)
-            share = shares[sample].get(label, 0.0)
-            value = ratio(share, median[label]) if chrom in AUTOSOMES else None
-            rows.append([
-                sample, chrom, f"{chrom.removeprefix('chr')}{arm}", label,
-                cyto[sample]["bands"].get(label, 0), fmt(share * 1e6, 1),
-                fmt(value), flag(value, args.max_deviation),
-            ])  # fmt: skip
-    header = ["sample", "chrom", "arm", "band", "bp", "ppm", "ratio", "flag"]
-    write_tsv(path, header, rows)
-
-
-def write_bins_dosage(data, feature_set, reference, args, path):
-    """Write a long table: one row per sample and bin, with ppm, ratio, flag."""
-    shares, bin_bp = {}, {}
-    for sample, per_set in data.items():
-        counts = per_set.get(feature_set, {})
-        bins = {lb: bp for lb, bp in counts.items() if parse_bin(lb)}
-        # bins plus the chromosome nodes (k-mers shared between bins of one
-        # chromosome) of the autosomes
-        autosomal = sum(bp for lb, bp in counts.items() if bins_chrom(lb) in AUTOSOMES)
-        if autosomal == 0:
-            raise ValueError(f"{sample}: no autosomal k-mers in the {feature_set} set")
-        bin_bp[sample] = bins
-        shares[sample] = {lb: bp / autosomal for lb, bp in bins.items()}
-    median = reference_medians(shares, reference)
-    labels = sorted(median, key=bin_key)
-    rows = []
-    for sample in sorted(data):
-        for label in labels:
-            chrom, start, end = parse_bin(label)
-            share = shares[sample].get(label, 0.0)
-            value = ratio(share, median[label]) if chrom in AUTOSOMES else None
-            rows.append([
-                sample, chrom, start, end, bin_bp[sample].get(label, 0),
-                fmt(share * 1e6, 1), fmt(value), flag(value, args.max_deviation),
-            ])  # fmt: skip
-    header = ["sample", "chrom", "start", "end", "bp", "ppm", "ratio", "flag"]
-    write_tsv(path, header, rows)
+# cohort
 
 
 def select_reference(data, text):
-    """Return the reference samples (default: all), checking they exist."""
-    if not text:
-        reference = sorted(data)
-    else:
-        requested = [s for s in text.split(",") if s]
-        reference = [s for s in requested if s in data]
-        missing = sorted(set(requested) - set(reference))
-        if missing:
-            warn(f"reference samples not in this run, ignored: {', '.join(missing)}")
-        if not reference:
-            raise ValueError("none of the --reference-samples are in this run")
-    if len(reference) < 5:
-        warn(
-            f"only {len(reference)} reference samples: their median is not a "
-            "reliable baseline for the dosage ratios"
-        )
-    print(f"[summarize] baseline: median of {len(reference)} samples", file=sys.stderr)
+    """Return the requested reference samples that are in this run."""
+    requested = [s for s in text.split(",") if s]
+    reference = [s for s in requested if s in data]
+    missing = sorted(set(requested) - set(reference))
+    if missing:
+        warn(f"reference samples not in this run, ignored: {', '.join(missing)}")
+    if not reference:
+        raise ValueError("none of the --reference-samples are in this run")
     return reference
 
 
+def resolve_expectations(data, shares, sexes, args):
+    """Return the reference values and where they come from.
+
+    In order of preference: the run's --reference-samples, the
+    --reference-values file, all samples of the run.
+    """
+    if args.reference_samples:
+        reference = select_reference(data, args.reference_samples)
+        source = f"reference samples of this run: {','.join(reference)}"
+    else:
+        if args.reference_values and args.reference_values.is_file():
+            expected = read_expectations(args.reference_values, args.database)
+            if expected is not None:
+                source = f"reference values file {args.reference_values}"
+                print(f"[summarize] baseline: {source}", file=sys.stderr)
+                return expected, source
+        reference = sorted(data)
+        source = f"all samples of this run (no reference given): {','.join(reference)}"
+        warn(
+            "no reference values file and no reference samples: copies are relative "
+            "to the median of this run's samples"
+        )
+    if len(reference) < 5:
+        warn(f"only {len(reference)} reference samples: medians are not robust")
+    print(f"[summarize] baseline: {source}", file=sys.stderr)
+    return expectations_from_samples(shares, sexes, reference), source
+
+
 def summarize_cohort(args):
-    """Write the composition tables and every dosage table the sets allow."""
+    """Write the composition tables, the reference values and the dosage tables."""
     data = read_sample_tables(args.inputs)
     feature_sets = split_sets(args.feature_sets)
-    reference = select_reference(data, args.reference_samples)
     outdir = args.outdir
     outdir.mkdir(parents=True, exist_ok=True)
 
@@ -532,25 +664,33 @@ def summarize_cohort(args):
             out = outdir.joinpath(f"SAMPLES.{feature_set}.composition.tsv")
             write_composition(data, feature_set, out)
 
-    if CHROMOSOME_SET in feature_sets:
+    shares = {s: sample_shares(per_set, feature_sets) for s, per_set in data.items()}
+    sexes = bootstrap_sexes(shares)
+    if not sexes:
+        warn("'chromosome' not annotated: no sex call, no X/Y reference values")
+    expected, source = resolve_expectations(data, shares, sexes, args)
+    calls = sex_calls(shares, expected)
+    write_expectations(
+        outdir.joinpath("SAMPLES.reference_values.tsv"), expected, args.database, source
+    )
+
+    if calls:
         out = outdir.joinpath("SAMPLES.chromosome_dosage.tsv")
-        write_chromosome_dosage(data, reference, args, out)
-    else:
-        warn("'chromosome' not annotated: skipping chromosome dosage and sex call")
+        write_chromosome_dosage(data, calls, shares, expected, args, out)
 
     if CYTOBAND_SET in feature_sets:
-        cyto = cytoband_shares(data)
-        out = outdir.joinpath("SAMPLES.arm_dosage.tsv")
-        write_arm_dosage(cyto, reference, args, out)
+        write_arm_dosage(
+            shares, expected, args, outdir.joinpath("SAMPLES.arm_dosage.tsv")
+        )
         out = outdir.joinpath("SAMPLES.cytoband_dosage.tsv")
-        write_cytoband_dosage(cyto, reference, args, out)
+        write_cytoband_dosage(shares, expected, args, out)
     else:
         warn("'cytoband' not annotated: skipping arm and band dosage")
 
     bins_sets = [fs for fs in feature_sets if is_bins_set(fs)]
     for feature_set in bins_sets:
         out = outdir.joinpath(f"SAMPLES.{feature_set}_dosage.tsv")
-        write_bins_dosage(data, feature_set, reference, args, out)
+        write_bins_dosage(shares, expected, feature_set, args, out)
     if not bins_sets:
         warn("no 'bins_*' set annotated: skipping bin dosage")
 

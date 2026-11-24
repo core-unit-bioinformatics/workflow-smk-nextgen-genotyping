@@ -85,20 +85,6 @@ karyoscope:
   # samples whose median is the baseline for all ratios (default: all samples);
   # for tumour cohorts, list normal samples here
   reference_samples: ""
-  # sex call, part 1 - Y: chrY bp per million autosomal bp 
-  # >= male_y_ppm: Y present; 
-  # <= female_y_ppm: Y absent; in between: ambiguous
-  male_y_ppm: 1000
-  female_y_ppm: 500
-  # sex call, part 2 - X: expected chrX ppm of autosomal bp for TWO X copies
-  # (chrX_copies = 2 * chrX_ppm / x_diploid_ppm); a copy estimate further
-  # than x_copy_tolerance from a whole number is called ambiguous
-  x_diploid_ppm: 53000
-  x_copy_tolerance: 0.25
-  # expected chrY ppm of autosomal bp for ONE Y copy, only used for the
-  # chrY_copies column (the Y part of the sex call uses the ppm thresholds);
-  # rough estimate - set it to chrY_ppm of the first confirmed XY sample
-  y_haploid_ppm: 3500
   # flag a ratio to the reference median that deviates by more than this
   max_deviation: 0.2
 
