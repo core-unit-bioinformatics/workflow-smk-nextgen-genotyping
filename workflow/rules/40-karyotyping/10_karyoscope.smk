@@ -40,7 +40,7 @@ KARYOSCOPE_RESULTS_DIR = DIR_RES.joinpath("karyotyping", "karyoscope")
 #
 # The default file for HKS_CHM13v2_karyo is derived from 8 unrelated normal
 # genomes of the 1000 Genomes 30x WGS data (NYGC, Illumina NovaSeq 2x150, ENA
-# PRJEB31736/PRJEB36890), 20 M read pairs (~2x) each:
+# PRJEB31736/PRJEB36890), a random 10 M read pairs (~1x) each:
 #   NA12891 (M) / NA12892 (F)  CEU, Utah, European ancestry
 #   NA19239 (M) / NA19238 (F)  YRI, Yoruba, Nigeria
 #   HG00512 (M) / HG00513 (F)  CHS, Southern Han Chinese

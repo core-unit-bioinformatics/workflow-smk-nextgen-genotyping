@@ -196,18 +196,25 @@ NovaSeq 2×150), 4 female and 4 male, 4 populations:
 Several individuals from several populations average out individual variation; both sexes
 are needed for the X and Y values.
 
-**1. On a machine with internet**, stream 20 million read pairs (~2× coverage, like the
-downsampled data) per sample from ENA:
+**1. On a machine with internet**, get a random 10 million read pairs (~1× coverage) per
+sample from ENA:
 
 ```bash
-bash workflow/scripts/karyoscope/fetch_reference_reads.sh karyoscope_reference_reads
+# needs seqtk (conda install -c bioconda seqtk); http if https to ENA is blocked
+ENA_PROTOCOL=http bash workflow/scripts/karyoscope/fetch_reference_reads.sh karyoscope_reference_reads
 # optional: read pairs and own sample list
-# bash .../fetch_reference_reads.sh OUTDIR 20000000 NA12891 NA12892 ...
+# bash .../fetch_reference_reads.sh OUTDIR 10000000 NA12891 NA12892 ...
 ```
 
-This writes `<sample>_R1.fq.gz` / `_R2.fq.gz` (~1.5 GB each) and
-`sample_sheet_reference.tsv`. Only the first 20 M read pairs are downloaded (FASTQ order
-follows the flowcell, not the genome, so this is a random subsample).
+This writes `<sample>_R1.fq.gz` / `_R2.fq.gz` (~300 MB each) and
+`sample_sheet_reference.tsv`. The 30x data were submitted as position-sorted CRAMs, and
+ENA's FASTQs keep that order, so the first reads would all be chr1. The script therefore
+streams each FASTQ completely (~13 GB per mate, ~215 GB for all 8) and keeps a random
+fraction with `seqtk sample` (same seed for R1 and R2, so the pairs stay together); only
+the subsample is written to disk. This takes hours: run it in `screen`/`tmux`, several
+samples in parallel (one call per sample or pair; rebuild the sample sheet afterwards). An
+interrupted run continues where it stopped: finished samples and finished mate files are
+kept.
 
 **2. Copy them to the server** and replace the local folder in the sample sheet's paths
 with the folder on the server:

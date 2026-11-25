@@ -10,7 +10,7 @@
 # so the pairs stay together). Only the subsample is written to disk.
 #
 # Usage: fetch_reference_reads.sh OUTDIR [READ_PAIRS] [SAMPLE ...]
-#   READ_PAIRS default 20000000 (~6 Gbp, ~2x coverage; the result is within
+#   READ_PAIRS default 10000000 (~3 Gbp, ~1x coverage; the result is within
 #              a fraction of a percent of it)
 #   SAMPLE     default: 8 unrelated individuals, 4 female / 4 male,
 #              4 populations (CEU, YRI, CHS, PUR)
@@ -25,7 +25,7 @@ protocol=${ENA_PROTOCOL:-https}
 seed=11
 
 outdir=${1:?usage: fetch_reference_reads.sh OUTDIR [READ_PAIRS] [SAMPLE ...]}
-pairs=${2:-20000000}
+pairs=${2:-10000000}
 shift $(( $# >= 2 ? 2 : $# ))
 samples=("$@")
 if [[ ${#samples[@]} -eq 0 ]]; then
@@ -125,8 +125,18 @@ for sample in "${samples[@]}"; do
         echo "${report}" >&2
         exit 1
     fi
-    fraction=$(awk -v n="${pairs}" -v t="${total}" 'BEGIN { printf "%.6f", n / t }')
-    echo "[reference_reads] ${sample}: run ${run}, ${total} read pairs, keeping a random ${fraction}"
+    # ENA's read_count counts both mates: pairs = read_count / 2
+    fraction=$(awk -v n="${pairs}" -v t="${total}" 'BEGIN { printf "%.6f", n / (t / 2) }')
+    echo "[reference_reads] ${sample}: run ${run}, $((total / 2)) read pairs, keeping a random ${fraction}"
+    # a mate file kept from an earlier run must come from the same fraction
+    fraction_file="${outdir}/.${sample}.fraction"
+    if [[ -s "${fraction_file}" && "$(cat "${fraction_file}")" != "${fraction}" ]]; then
+        echo "[reference_reads] ERROR: ${sample} was started with fraction $(cat "${fraction_file}")," >&2
+        echo "[reference_reads] now ${fraction} (other READ_PAIRS?). Use the same READ_PAIRS, or" >&2
+        echo "[reference_reads] delete ${sample}_R?.fq.gz and ${fraction_file} to start over." >&2
+        exit 1
+    fi
+    echo "${fraction}" > "${fraction_file}"
 
     rm -f "${done_marker}"
     for mate in 1 2; do
